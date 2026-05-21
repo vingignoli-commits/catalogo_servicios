@@ -181,6 +181,7 @@ export default async function ProfessionalPublicPage({ params }: Props) {
                   durationMinutes: number;
                   price: unknown;
                   isActive: boolean;
+                  modality: string;
                 }) => (
                   <AppCard
                     key={service.id}
