@@ -29,13 +29,13 @@ export async function loginAction(formData: FormData) {
     password,
   });
 
-  if (error || !data.user) {
+  if (error || !data.user?.email) {
     redirect("/login?error=Credenciales%20inv%C3%A1lidas.");
   }
 
   const appUser = await prisma.user.findUnique({
     where: {
-      email,
+      email: data.user.email.toLowerCase(),
     },
     select: {
       role: true,
@@ -44,12 +44,12 @@ export async function loginAction(formData: FormData) {
   });
 
   if (!appUser) {
+    await supabase.auth.signOut();
     redirect("/login?error=Usuario%20sin%20perfil%20interno.");
   }
 
   if (appUser.status === "SUSPENDED") {
     await supabase.auth.signOut();
-
     redirect("/login?error=Tu%20cuenta%20est%C3%A1%20suspendida.");
   }
 
