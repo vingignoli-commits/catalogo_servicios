@@ -179,7 +179,7 @@ export default async function ProfessionalPublicPage({ params }: Props) {
                   title: string;
                   description: string | null;
                   durationMinutes: number;
-                  price: unknown;
+                  price: { toString: () => string };
                   isActive: boolean;
                   modality: string;
                 }) => (
