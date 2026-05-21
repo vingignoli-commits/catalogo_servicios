@@ -174,7 +174,14 @@ export default async function ProfessionalPublicPage({ params }: Props) {
               </AppCard>
             ) : (
               <div className="space-y-5">
-                {professional.services.map((service) => (
+                {professional.services.map((service: {
+                  id: string;
+                  title: string;
+                  description: string | null;
+                  durationMinutes: number;
+                  price: unknown;
+                  isActive: boolean;
+                }) => (
                   <AppCard
                     key={service.id}
                     className="border-slate-100 hover:border-blue-200 hover:shadow-lg"
