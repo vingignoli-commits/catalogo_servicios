@@ -34,6 +34,26 @@ type PublicService = {
   modality: string;
 };
 
+type ProfessionalListItem = {
+  id: string;
+  businessName: string | null;
+  bio: string | null;
+  averageRating: number;
+  reviewCount: number;
+  profileImageUrl: string | null;
+  user: {
+    name: string | null;
+    email: string;
+  };
+  services: {
+    id: string;
+    title: string;
+    price: {
+      toString: () => string;
+    };
+  }[];
+};
+
 export default async function ProfessionalPublicPage({ params }: Props) {
   const { id } = await params;
 
