@@ -289,7 +289,18 @@ export default async function ProfessionalPublicPage({ params }: Props) {
               </AppCard>
             ) : (
               <div className="space-y-4">
-                {reviews.map((review) => (
+                {reviews.map((review: {
+                  id: string;
+                  rating: number;
+                  comment: string | null;
+                  createdAt: Date;
+                  client: {
+                    user: {
+                      name: string | null;
+                      email: string;
+                    };
+                  };
+                }) => (
                   <AppCard key={review.id} className="border-slate-100">
                     <div className="flex items-start justify-between gap-4">
                       <div>
