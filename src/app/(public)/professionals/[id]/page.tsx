@@ -293,6 +293,7 @@ export default async function ProfessionalPublicPage({ params }: Props) {
                   id: string;
                   rating: number;
                   comment: string | null;
+                  professionalReply: string | null;
                   createdAt: Date;
                   client: {
                     user: {
