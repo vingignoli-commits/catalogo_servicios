@@ -252,7 +252,7 @@ export default async function ProfessionalResourcesPage({
 
                           <div className="mt-4 flex flex-wrap gap-3 text-xs font-medium text-slate-500">
                             <span className="rounded-full bg-white px-3 py-2">
-                              {resource._count.services} servicio(s)
+                              {resource.services.length} servicio(s)
                             </span>
                             <span className="rounded-full bg-white px-3 py-2">
                               {resource._count.availability} horario(s)

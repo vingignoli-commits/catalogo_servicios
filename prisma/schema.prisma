@@ -48,6 +48,7 @@ model ProfessionalProfile {
   appointments           Appointment[]
   conversations          Conversation[]
   reviews                Review[]                @relation("ProfessionalReviews")
+  calendarBlocks         CalendarBlock[]
 
   @@index([isActive])
   @@index([location])
@@ -114,9 +115,10 @@ model Resource {
 
   professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
 
-  services     ResourceService[]
-  availability ResourceAvailability[]
-  appointments Appointment[]
+  services       ResourceService[]
+  calendarBlocks CalendarBlock[]
+  availability   ResourceAvailability[]
+  appointments   Appointment[]
 
   @@index([professionalId])
   @@index([isActive])
@@ -186,6 +188,30 @@ model ResourceAvailability {
 
   @@index([resourceId])
   @@index([dayOfWeek])
+}
+
+model CalendarBlock {
+  id String @id @default(uuid())
+
+  professionalId String
+  resourceId     String?
+
+  startDateTime DateTime
+  endDateTime   DateTime
+
+  reason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  resource Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+
+  @@index([professionalId])
+  @@index([resourceId])
+  @@index([startDateTime])
+  @@index([endDateTime])
 }
 
 model Appointment {

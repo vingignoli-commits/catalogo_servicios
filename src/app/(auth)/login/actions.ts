@@ -1,31 +1,26 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { z } from "zod";
 
 import { prisma } from "@/lib/db/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getDashboardPathByRole } from "@/lib/auth/role-redirect";
 
-const loginSchema = z.object({
-  email: z.string().email("Email inválido."),
-  password: z.string().min(1, "La contraseña es obligatoria."),
-});
+function getRedirectPath(role: string) {
+  if (role === "ADMIN") return "/admin";
+  if (role === "PROFESSIONAL") return "/professional";
+  return "/client";
+}
 
 export async function loginAction(formData: FormData) {
-  const rawData = {
-    email: String(formData.get("email") ?? "").toLowerCase().trim(),
-    password: String(formData.get("password") ?? ""),
-  };
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
 
-  const parsed = loginSchema.safeParse(rawData);
+  const password = String(formData.get("password") ?? "");
 
-  if (!parsed.success) {
-    const message = parsed.error.issues[0]?.message ?? "Datos inválidos.";
-    redirect(`/login?error=${encodeURIComponent(message)}`);
+  if (!email || !password) {
+    redirect("/login?error=Complet%C3%A1%20email%20y%20contrase%C3%B1a.");
   }
-
-  const { email, password } = parsed.data;
 
   const supabase = await createSupabaseServerClient();
 
@@ -34,33 +29,29 @@ export async function loginAction(formData: FormData) {
     password,
   });
 
-  if (error || !data.user?.email) {
-    redirect(
-      `/login?error=${encodeURIComponent(
-        "Credenciales inválidas o usuario no confirmado."
-      )}`
-    );
+  if (error || !data.user) {
+    redirect("/login?error=Credenciales%20inv%C3%A1lidas.");
   }
 
   const appUser = await prisma.user.findUnique({
     where: {
-      email: data.user.email,
+      email,
+    },
+    select: {
+      role: true,
+      status: true,
     },
   });
 
   if (!appUser) {
-    redirect(
-      `/login?error=${encodeURIComponent(
-        "El usuario existe en Supabase pero no en la base interna."
-      )}`
-    );
+    redirect("/login?error=Usuario%20sin%20perfil%20interno.");
   }
 
   if (appUser.status === "SUSPENDED") {
-    redirect(
-      `/login?error=${encodeURIComponent("Tu cuenta está suspendida.")}`
-    );
+    await supabase.auth.signOut();
+
+    redirect("/login?error=Tu%20cuenta%20est%C3%A1%20suspendida.");
   }
 
-  redirect(getDashboardPathByRole(appUser.role));
+  redirect(getRedirectPath(appUser.role));
 }
