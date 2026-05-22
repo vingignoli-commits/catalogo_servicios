@@ -21,6 +21,19 @@ function formatDate(date: Date) {
   });
 }
 
+type ConversationMessage = {
+  id: string;
+  senderId: string;
+  content: string;
+  createdAt: Date;
+  readAt: Date | null;
+  sender: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
+};
+
 export default async function ClientConversationPage({
   params,
 }: {
@@ -187,7 +200,7 @@ export default async function ClientConversationPage({
                 Todavía no hay mensajes.
               </p>
             ) : (
-              conversation.messages.map((message) => {
+              conversation.messages.map((message: ConversationMessage) => {
                 const isMine = message.senderId === user.id;
 
                 return (
