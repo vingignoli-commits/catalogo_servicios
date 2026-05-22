@@ -27,8 +27,30 @@ function formatRating(value: number) {
   return value.toFixed(1);
 }
 
+type FeaturedService = {
+  id: string;
+  title: string;
+  price: {
+    toString: () => string;
+  };
+};
+
+type FeaturedProfessional = {
+  id: string;
+  businessName: string | null;
+  bio: string | null;
+  averageRating: number;
+  reviewCount: number;
+  user: {
+    name: string | null;
+    email: string;
+  };
+  services: FeaturedService[];
+};
+
 export default async function HomePage() {
-  const featuredProfessionals = await prisma.professionalProfile.findMany({
+  const featuredProfessionals: FeaturedProfessional[] =
+  await prisma.professionalProfile.findMany({
     where: {
       isActive: true,
     },
@@ -273,7 +295,7 @@ export default async function HomePage() {
             </div>
           ) : (
             <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {featuredProfessionals.map((professional) => (
+              {featuredProfessionals.map((professional: FeaturedProfessional) => (
                 <Link
                   key={professional.id}
                   href={`/professionals/${professional.id}`}
@@ -305,7 +327,7 @@ export default async function HomePage() {
                         Sin servicios publicados.
                       </p>
                     ) : (
-                      professional.services.map((service) => (
+                      professional.services.map((service: FeaturedService) => (
                         <div
                           key={service.id}
                           className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3"
