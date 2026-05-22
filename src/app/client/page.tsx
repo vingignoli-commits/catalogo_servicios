@@ -25,6 +25,12 @@ function formatAppointmentStatus(status: string) {
   return labels[status] ?? status;
 }
 
+type DashboardNotification = {
+  id: string;
+  title: string;
+  content: string | null;
+};
+
 export default async function ClientDashboardPage() {
   const user = await requireRole(["CLIENT"]);
 
@@ -68,7 +74,8 @@ export default async function ClientDashboardPage() {
     },
   });
 
-  const unreadNotifications = await prisma.notification.findMany({
+  const unreadNotifications: DashboardNotification[] =
+  await prisma.notification.findMany({
     where: {
       userId: user.id,
       readAt: null,
@@ -172,7 +179,7 @@ export default async function ClientDashboardPage() {
             </div>
 
             <div className="mt-5 grid gap-3">
-              {unreadNotifications.map((notification) => (
+              {unreadNotifications.map((notification: DashboardNotification) => (
                 <Link
                   key={notification.id}
                   href="/client/notifications"
