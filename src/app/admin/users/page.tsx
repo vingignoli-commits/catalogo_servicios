@@ -2,11 +2,26 @@ import { prisma } from "@/lib/db/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { toggleUserStatus } from "./actions";
 
+type AdminUserListItem = {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  createdAt: Date;
+};
+
 export default async function AdminUsersPage() {
   await requireRole(["ADMIN"]);
 
-  const users = await prisma.user.findMany({
+  const users: AdminUserListItem[] = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      status: true,
+      createdAt: true,
+    },
   });
 
   return (
@@ -26,11 +41,8 @@ export default async function AdminUsersPage() {
             </thead>
 
             <tbody>
-              {users.map((user) => (
-                <tr
-                  key={user.id}
-                  className="border-t border-slate-800"
-                >
+              {users.map((user: AdminUserListItem) => (
+                <tr key={user.id} className="border-t border-slate-800">
                   <td className="p-4">{user.email}</td>
                   <td className="p-4">{user.role}</td>
                   <td className="p-4">{user.status}</td>
