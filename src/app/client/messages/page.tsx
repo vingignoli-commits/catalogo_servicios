@@ -10,6 +10,41 @@ import { prisma } from "@/lib/db/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { markClientConversationAsUnreadAction } from "./actions";
 
+type ConversationMessage = {
+  id: string;
+  senderId: string;
+  content: string;
+  createdAt: Date;
+  readAt: Date | null;
+  sender: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
+};
+
+type ClientConversationItem = {
+  id: string;
+  updatedAt: Date;
+  professional: {
+    user: {
+      name: string | null;
+      email: string;
+    };
+  };
+  appointment: {
+    service: {
+      title: string;
+    };
+  } | null;
+  messages: ConversationMessage[];
+};
+
+type EnrichedClientConversationItem = ClientConversationItem & {
+  lastMessage: ConversationMessage | null;
+  unreadMessagesCount: number;
+};
+
 function formatDate(date: Date) {
   return date.toLocaleString("es-AR", {
     day: "2-digit",
@@ -23,51 +58,55 @@ function formatDate(date: Date) {
 export default async function ClientMessagesPage() {
   const user = await requireRole(["CLIENT"]);
 
-  const conversations = await prisma.conversation.findMany({
-    where: {
-      client: {
-        userId: user.id,
-      },
-    },
-    include: {
-      professional: {
-        include: {
-          user: true,
+  const conversations: ClientConversationItem[] =
+    await prisma.conversation.findMany({
+      where: {
+        client: {
+          userId: user.id,
         },
       },
-      appointment: {
-        include: {
-          service: true,
+      include: {
+        professional: {
+          include: {
+            user: true,
+          },
+        },
+        appointment: {
+          include: {
+            service: true,
+          },
+        },
+        messages: {
+          orderBy: {
+            createdAt: "desc",
+          },
+          include: {
+            sender: true,
+          },
         },
       },
-      messages: {
-        orderBy: {
-          createdAt: "desc",
-        },
-        include: {
-          sender: true,
-        },
+      orderBy: {
+        updatedAt: "desc",
       },
-    },
-    orderBy: {
-      updatedAt: "desc",
-    },
-  });
+    });
 
-  const enrichedConversations = conversations.map((conversation) => {
-    const unreadMessages = conversation.messages.filter(
-      (message) => message.senderId !== user.id && !message.readAt
-    );
+  const enrichedConversations: EnrichedClientConversationItem[] =
+    conversations.map((conversation: ClientConversationItem) => {
+      const unreadMessages = conversation.messages.filter(
+        (message: ConversationMessage) =>
+          message.senderId !== user.id && !message.readAt
+      );
 
-    return {
-      ...conversation,
-      lastMessage: conversation.messages[0] ?? null,
-      unreadMessagesCount: unreadMessages.length,
-    };
-  });
+      return {
+        ...conversation,
+        lastMessage: conversation.messages[0] ?? null,
+        unreadMessagesCount: unreadMessages.length,
+      };
+    });
 
   const unreadTotal = enrichedConversations.reduce(
-    (acc, conversation) => acc + conversation.unreadMessagesCount,
+    (acc: number, conversation: EnrichedClientConversationItem) =>
+      acc + conversation.unreadMessagesCount,
     0
   );
 
@@ -133,100 +172,102 @@ export default async function ClientMessagesPage() {
             </p>
           ) : (
             <div className="mt-6 grid gap-4 sm:mt-8">
-              {enrichedConversations.map((conversation) => {
-                const hasUnread = conversation.unreadMessagesCount > 0;
-                const professionalName =
-                  conversation.professional.user.name ??
-                  conversation.professional.user.email;
+              {enrichedConversations.map(
+                (conversation: EnrichedClientConversationItem) => {
+                  const hasUnread = conversation.unreadMessagesCount > 0;
+                  const professionalName =
+                    conversation.professional.user.name ??
+                    conversation.professional.user.email;
 
-                return (
-                  <article
-                    key={conversation.id}
-                    className={`rounded-3xl border p-5 transition sm:p-6 ${
-                      hasUnread
-                        ? "border-blue-400 bg-blue-50 shadow-md"
-                        : "border-slate-200 bg-slate-50"
-                    }`}
-                  >
-                    <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-                      <Link
-                        href={`/client/messages/${conversation.id}`}
-                        className="min-w-0 flex-1"
-                      >
-                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                          <h3
-                            className={`text-base sm:text-lg ${
-                              hasUnread
-                                ? "font-extrabold text-blue-950"
-                                : "font-bold text-slate-950"
-                            }`}
-                          >
-                            {professionalName}
-                          </h3>
-
-                          {hasUnread ? (
-                            <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">
-                              {conversation.unreadMessagesCount} nuevo(s)
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-600">
-                              Leído
-                            </span>
-                          )}
-                        </div>
-
-                        <p className="mt-2 text-sm font-medium text-slate-500">
-                          {conversation.appointment?.service.title ??
-                            "Conversación"}
-                        </p>
-
-                        {conversation.lastMessage ? (
-                          <>
-                            <p
-                              className={`mt-4 line-clamp-2 text-sm ${
-                                hasUnread
-                                  ? "font-bold text-slate-950"
-                                  : "text-slate-600"
-                              }`}
-                            >
-                              {conversation.lastMessage.content}
-                            </p>
-
-                            <p className="mt-3 text-xs text-slate-400">
-                              {formatDate(conversation.lastMessage.createdAt)}
-                            </p>
-                          </>
-                        ) : null}
-                      </Link>
-
-                      <div className="flex w-full shrink-0 flex-col gap-2 md:w-[180px]">
+                  return (
+                    <article
+                      key={conversation.id}
+                      className={`rounded-3xl border p-5 transition sm:p-6 ${
+                        hasUnread
+                          ? "border-blue-400 bg-blue-50 shadow-md"
+                          : "border-slate-200 bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                         <Link
                           href={`/client/messages/${conversation.id}`}
-                          className="rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-blue-700 md:py-2"
+                          className="min-w-0 flex-1"
                         >
-                          Abrir
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                            <h3
+                              className={`text-base sm:text-lg ${
+                                hasUnread
+                                  ? "font-extrabold text-blue-950"
+                                  : "font-bold text-slate-950"
+                              }`}
+                            >
+                              {professionalName}
+                            </h3>
+
+                            {hasUnread ? (
+                              <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">
+                                {conversation.unreadMessagesCount} nuevo(s)
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-600">
+                                Leído
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="mt-2 text-sm font-medium text-slate-500">
+                            {conversation.appointment?.service.title ??
+                              "Conversación"}
+                          </p>
+
+                          {conversation.lastMessage ? (
+                            <>
+                              <p
+                                className={`mt-4 line-clamp-2 text-sm ${
+                                  hasUnread
+                                    ? "font-bold text-slate-950"
+                                    : "text-slate-600"
+                                }`}
+                              >
+                                {conversation.lastMessage.content}
+                              </p>
+
+                              <p className="mt-3 text-xs text-slate-400">
+                                {formatDate(conversation.lastMessage.createdAt)}
+                              </p>
+                            </>
+                          ) : null}
                         </Link>
 
-                        {!hasUnread && conversation.lastMessage ? (
-                          <form action={markClientConversationAsUnreadAction}>
-                            <input
-                              type="hidden"
-                              name="conversationId"
-                              value={conversation.id}
-                            />
-                            <button
-                              type="submit"
-                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 md:py-2"
-                            >
-                              Marcar no leído
-                            </button>
-                          </form>
-                        ) : null}
+                        <div className="flex w-full shrink-0 flex-col gap-2 md:w-[180px]">
+                          <Link
+                            href={`/client/messages/${conversation.id}`}
+                            className="rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-blue-700 md:py-2"
+                          >
+                            Abrir
+                          </Link>
+
+                          {!hasUnread && conversation.lastMessage ? (
+                            <form action={markClientConversationAsUnreadAction}>
+                              <input
+                                type="hidden"
+                                name="conversationId"
+                                value={conversation.id}
+                              />
+                              <button
+                                type="submit"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 md:py-2"
+                              >
+                                Marcar no leído
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  </article>
-                );
-              })}
+                    </article>
+                  );
+                }
+              )}
             </div>
           )}
         </section>
