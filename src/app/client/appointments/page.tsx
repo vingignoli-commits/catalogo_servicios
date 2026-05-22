@@ -12,6 +12,39 @@ import { prisma } from "@/lib/db/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { StatusBadge } from "@/components/ui/status-badge";
 
+type AppointmentCardData = {
+  id: string;
+  date: Date;
+  startTime: string;
+  endTime: string;
+  status: string;
+  statusReason: string | null;
+  service: {
+    title: string;
+    durationMinutes: number;
+  };
+  resource: {
+    name: string;
+    type: string;
+  } | null;
+  professional: {
+    id: string;
+    user: {
+      name: string | null;
+      email: string;
+    };
+  };
+  conversation: {
+    id: string;
+    messages: {
+      id: string;
+    }[];
+  } | null;
+  reviews: {
+    id: string;
+  }[];
+};
+
 function formatDateDDMMYYYY(date: Date) {
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -73,7 +106,7 @@ export default async function ClientAppointmentsPage({
     );
   }
 
-  const appointments = await prisma.appointment.findMany({
+  const appointments: AppointmentCardData[] = await prisma.appointment.findMany({
     where: {
       clientId: clientProfile.id,
     },
@@ -102,22 +135,27 @@ export default async function ClientAppointmentsPage({
     orderBy: [{ date: "desc" }, { startTime: "desc" }],
   });
 
-  const activeAppointments = appointments.filter((appointment) =>
-    ["REQUESTED", "ACCEPTED"].includes(appointment.status)
+  const activeAppointments = appointments.filter(
+    (appointment: AppointmentCardData) =>
+      ["REQUESTED", "ACCEPTED"].includes(appointment.status)
   );
 
   const reviewableAppointments = appointments.filter(
-    (appointment) =>
+    (appointment: AppointmentCardData) =>
       appointment.status === "COMPLETED" && appointment.reviews.length === 0
   );
 
   const historicalAppointments = appointments.filter(
-    (appointment) => !["REQUESTED", "ACCEPTED"].includes(appointment.status)
+    (appointment: AppointmentCardData) =>
+      !["REQUESTED", "ACCEPTED"].includes(appointment.status)
   );
 
-  const unreadMessagesCount = appointments.reduce((acc, appointment) => {
-    return acc + (appointment.conversation?.messages.length ?? 0);
-  }, 0);
+  const unreadMessagesCount = appointments.reduce(
+    (acc: number, appointment: AppointmentCardData) => {
+      return acc + (appointment.conversation?.messages.length ?? 0);
+    },
+    0
+  );
 
   return (
     <main className="min-h-screen bg-slate-100 pb-24 text-slate-950 md:pb-0">
@@ -297,7 +335,7 @@ function AppointmentsSection({
         </p>
       ) : (
         <div className="mt-5 grid gap-4 sm:mt-6 sm:gap-5">
-          {appointments.map((appointment) => (
+          {appointments.map((appointment: AppointmentCardData) => (
             <AppointmentCard key={appointment.id} appointment={appointment} />
           ))}
         </div>
@@ -305,39 +343,6 @@ function AppointmentsSection({
     </section>
   );
 }
-
-type AppointmentCardData = {
-  id: string;
-  date: Date;
-  startTime: string;
-  endTime: string;
-  status: string;
-  statusReason: string | null;
-  service: {
-    title: string;
-    durationMinutes: number;
-  };
-  resource: {
-    name: string;
-    type: string;
-  } | null;
-  professional: {
-    id: string;
-    user: {
-      name: string | null;
-      email: string;
-    };
-  };
-  conversation: {
-    id: string;
-    messages: {
-      id: string;
-    }[];
-  } | null;
-  reviews: {
-    id: string;
-  }[];
-};
 
 function AppointmentCard({
   appointment,
