@@ -13,6 +13,29 @@ type ProfessionalsPageProps = {
   }>;
 };
 
+type ProfessionalListItem = {
+  id: string;
+  businessName: string | null;
+  specialty: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
+  averageRating: number;
+  reviewCount: number;
+
+  user: {
+    name: string | null;
+    email: string;
+  };
+
+  services: {
+    id: string;
+    title: string;
+    price: {
+      toString: () => string;
+    };
+  }[];
+};
+
 export default async function ProfessionalsPage({
   searchParams,
 }: ProfessionalsPageProps) {
@@ -144,7 +167,7 @@ export default async function ProfessionalsPage({
         </AppCard>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {professionals.map((professional) => (
+          {professionals.map((professional: ProfessionalListItem) => (
             <Link key={professional.id} href={`/professionals/${professional.id}`}>
               <AppCard className="h-full overflow-hidden p-0 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-100">
                 <div className="relative h-44 overflow-hidden">
