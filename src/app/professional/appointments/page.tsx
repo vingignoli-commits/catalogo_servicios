@@ -73,7 +73,8 @@ export default async function ProfessionalAppointmentsPage({
     );
   }
 
-  const appointments = await prisma.appointment.findMany({
+  const appointments: AppointmentCardData[] =
+  await prisma.appointment.findMany({
     where: {
       professionalId: profile.id,
     },
@@ -102,20 +103,29 @@ export default async function ProfessionalAppointmentsPage({
   });
 
   const requestedAppointments = appointments.filter(
-    (appointment) => appointment.status === "REQUESTED"
+    (appointment: AppointmentCardData) =>
+      appointment.status === "REQUESTED"
   );
 
   const acceptedAppointments = appointments.filter(
-    (appointment) => appointment.status === "ACCEPTED"
+    (appointment: AppointmentCardData) =>
+      appointment.status === "ACCEPTED"
   );
 
   const historicalAppointments = appointments.filter(
-    (appointment) => !["REQUESTED", "ACCEPTED"].includes(appointment.status)
+    (appointment: AppointmentCardData) =>
+      !["REQUESTED", "ACCEPTED"].includes(appointment.status)
   );
 
-  const unreadMessagesCount = appointments.reduce((acc, appointment) => {
+  const unreadMessagesCount = appointments.reduce(
+  (
+    acc: number,
+    appointment: AppointmentCardData
+  ) => {
     return acc + (appointment.conversation?.messages.length ?? 0);
-  }, 0);
+  }, 
+  0
+);
 
   return (
     <main className="min-h-screen bg-slate-100 pb-24 text-slate-950 md:pb-0">
@@ -291,7 +301,7 @@ function AppointmentsSection({
         </p>
       ) : (
         <div className="mt-5 grid gap-4 sm:mt-6 sm:gap-5">
-          {appointments.map((appointment) => (
+          {appointments.map((appointment: AppointmentCardData) => (
             <AppointmentCard key={appointment.id} appointment={appointment} />
           ))}
         </div>
