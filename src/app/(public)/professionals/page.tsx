@@ -19,6 +19,7 @@ type ProfessionalListItem = {
   specialty: string | null;
   bio: string | null;
   avatarUrl: string | null;
+  location: string | null;
   averageRating: number;
   reviewCount: number;
 
