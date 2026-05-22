@@ -14,6 +14,16 @@ import {
   markClientNotificationAsReadAction,
 } from "./actions";
 
+type ClientNotificationItem = {
+  id: string;
+  type: string;
+  title: string;
+  content: string | null;
+  actionUrl: string | null;
+  readAt: Date | null;
+  createdAt: Date;
+};
+
 function formatDate(date: Date) {
   return date.toLocaleString("es-AR", {
     day: "2-digit",
@@ -40,18 +50,19 @@ function getNotificationTypeLabel(type: string) {
 export default async function ClientNotificationsPage() {
   const user = await requireRole(["CLIENT"]);
 
-  const notifications = await prisma.notification.findMany({
-    where: {
-      userId: user.id,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 80,
-  });
+  const notifications: ClientNotificationItem[] =
+    await prisma.notification.findMany({
+      where: {
+        userId: user.id,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 80,
+    });
 
   const unreadCount = notifications.filter(
-    (notification) => !notification.readAt
+    (notification: ClientNotificationItem) => !notification.readAt
   ).length;
 
   return (
@@ -131,7 +142,7 @@ export default async function ClientNotificationsPage() {
             </p>
           ) : (
             <div className="mt-6 grid gap-4 sm:mt-8">
-              {notifications.map((notification) => {
+              {notifications.map((notification: ClientNotificationItem) => {
                 const isUnread = !notification.readAt;
 
                 return (
