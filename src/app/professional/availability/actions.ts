@@ -27,6 +27,12 @@ const exceptionSchema = z.object({
   reason: z.string().max(300).optional(),
 });
 
+type AvailabilityBlock = {
+  id: string;
+  startTime: string;
+  endTime: string;
+};
+
 async function getCurrentProfessionalProfile() {
   const user = await requireRole(["PROFESSIONAL"]);
 
@@ -67,23 +73,29 @@ async function hasOverlap({
   endTime: string;
   excludeAvailabilityId?: string;
 }) {
-  const existingBlocks = await prisma.availability.findMany({
-    where: {
-      professionalId,
-      dayOfWeek,
-      isActive: true,
-      id: excludeAvailabilityId
-        ? {
-            not: excludeAvailabilityId,
-          }
-        : undefined,
-    },
-  });
+  const existingBlocks: AvailabilityBlock[] =
+    await prisma.availability.findMany({
+      where: {
+        professionalId,
+        dayOfWeek,
+        isActive: true,
+        id: excludeAvailabilityId
+          ? {
+              not: excludeAvailabilityId,
+            }
+          : undefined,
+      },
+      select: {
+        id: true,
+        startTime: true,
+        endTime: true,
+      },
+    });
 
   const newStart = timeToMinutes(startTime);
   const newEnd = timeToMinutes(endTime);
 
-  return existingBlocks.some((block) => {
+  return existingBlocks.some((block: AvailabilityBlock) => {
     const blockStart = timeToMinutes(block.startTime);
     const blockEnd = timeToMinutes(block.endTime);
 
