@@ -15,6 +15,53 @@ import { prisma } from "@/lib/db/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { StatusBadge } from "@/components/ui/status-badge";
 
+type ActiveFlagItem = {
+  isActive: boolean;
+};
+
+type DashboardNotification = {
+  id: string;
+  title: string;
+  content: string | null;
+};
+
+type DashboardAppointment = {
+  id: string;
+  date: Date;
+  startTime: string;
+  endTime: string;
+  status: string;
+  service: {
+    title: string;
+    durationMinutes: number;
+  };
+  resource?: {
+    name: string;
+  } | null;
+  client: {
+    user: {
+      name: string | null;
+      email: string;
+    };
+  };
+};
+
+type DashboardReview = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  client: {
+    user: {
+      name: string | null;
+    };
+  };
+  appointment: {
+    service: {
+      title: string;
+    };
+  };
+};
+
 function formatDateDDMMYYYY(date: Date) {
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -101,12 +148,17 @@ export default async function ProfessionalDashboardPage() {
     );
   }
 
-  const activeServicesCount = profile.services.filter(
-    (service) => service.isActive
+  const services: ActiveFlagItem[] = profile.services;
+  const resources: ActiveFlagItem[] = profile.resources;
+  const reviews: DashboardReview[] = profile.reviews;
+  const latestAppointments: DashboardAppointment[] = profile.appointments;
+
+  const activeServicesCount = services.filter(
+    (service: ActiveFlagItem) => service.isActive
   ).length;
 
-  const activeResourcesCount = profile.resources.filter(
-    (resource) => resource.isActive
+  const activeResourcesCount = resources.filter(
+    (resource: ActiveFlagItem) => resource.isActive
   ).length;
 
   const pendingAppointmentsCount = await prisma.appointment.count({
@@ -123,51 +175,53 @@ export default async function ProfessionalDashboardPage() {
     },
   });
 
-  const todayAppointments = await prisma.appointment.findMany({
-    where: {
-      professionalId: profile.id,
-      date: {
-        gte: start,
-        lte: end,
-      },
-      status: {
-        in: ["REQUESTED", "ACCEPTED"],
-      },
-    },
-    include: {
-      service: true,
-      resource: true,
-      client: {
-        include: {
-          user: true,
+  const todayAppointments: DashboardAppointment[] =
+    await prisma.appointment.findMany({
+      where: {
+        professionalId: profile.id,
+        date: {
+          gte: start,
+          lte: end,
+        },
+        status: {
+          in: ["REQUESTED", "ACCEPTED"],
         },
       },
-    },
-    orderBy: [{ startTime: "asc" }],
-  });
+      include: {
+        service: true,
+        resource: true,
+        client: {
+          include: {
+            user: true,
+          },
+        },
+      },
+      orderBy: [{ startTime: "asc" }],
+    });
 
-  const upcomingAppointments = await prisma.appointment.findMany({
-    where: {
-      professionalId: profile.id,
-      date: {
-        gt: end,
-      },
-      status: {
-        in: ["REQUESTED", "ACCEPTED"],
-      },
-    },
-    include: {
-      service: true,
-      resource: true,
-      client: {
-        include: {
-          user: true,
+  const upcomingAppointments: DashboardAppointment[] =
+    await prisma.appointment.findMany({
+      where: {
+        professionalId: profile.id,
+        date: {
+          gt: end,
+        },
+        status: {
+          in: ["REQUESTED", "ACCEPTED"],
         },
       },
-    },
-    orderBy: [{ date: "asc" }, { startTime: "asc" }],
-    take: 5,
-  });
+      include: {
+        service: true,
+        resource: true,
+        client: {
+          include: {
+            user: true,
+          },
+        },
+      },
+      orderBy: [{ date: "asc" }, { startTime: "asc" }],
+      take: 5,
+    });
 
   const unreadMessagesCount = await prisma.message.count({
     where: {
@@ -181,18 +235,19 @@ export default async function ProfessionalDashboardPage() {
     },
   });
 
-  const unreadNotifications = await prisma.notification.findMany({
-    where: {
-      userId: user.id,
-      readAt: null,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 5,
-  });
+  const unreadNotifications: DashboardNotification[] =
+    await prisma.notification.findMany({
+      where: {
+        userId: user.id,
+        readAt: null,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 5,
+    });
 
-  const lastAppointment = profile.appointments[0] ?? null;
+  const lastAppointment = latestAppointments[0] ?? null;
 
   return (
     <main className="min-h-screen bg-slate-100 pb-24 text-slate-950 md:pb-0">
@@ -284,23 +339,25 @@ export default async function ProfessionalDashboardPage() {
             </div>
 
             <div className="mt-5 grid gap-3">
-              {unreadNotifications.map((notification) => (
-                <Link
-                  key={notification.id}
-                  href="/professional/notifications"
-                  className="rounded-2xl border border-blue-100 bg-white p-4 transition hover:border-blue-300"
-                >
-                  <p className="font-bold text-slate-950">
-                    {notification.title}
-                  </p>
-
-                  {notification.content ? (
-                    <p className="mt-1 text-sm text-slate-600">
-                      {notification.content}
+              {unreadNotifications.map(
+                (notification: DashboardNotification) => (
+                  <Link
+                    key={notification.id}
+                    href="/professional/notifications"
+                    className="rounded-2xl border border-blue-100 bg-white p-4 transition hover:border-blue-300"
+                  >
+                    <p className="font-bold text-slate-950">
+                      {notification.title}
                     </p>
-                  ) : null}
-                </Link>
-              ))}
+
+                    {notification.content ? (
+                      <p className="mt-1 text-sm text-slate-600">
+                        {notification.content}
+                      </p>
+                    ) : null}
+                  </Link>
+                )
+              )}
             </div>
           </section>
         ) : null}
@@ -440,20 +497,20 @@ export default async function ProfessionalDashboardPage() {
                 </Link>
               </div>
 
-              {profile.reviews.length === 0 ? (
+              {reviews.length === 0 ? (
                 <p className="mt-6 text-sm text-slate-500">
                   Todavía no recibiste reseñas.
                 </p>
               ) : (
                 <div className="mt-6 space-y-4">
-                  {profile.reviews.map((review) => (
+                  {reviews.map((review: DashboardReview) => (
                     <article
                       key={review.id}
                       className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
                     >
                       <div className="flex items-center gap-1 text-amber-500">
                         {Array.from({ length: review.rating }).map(
-                          (_, index) => (
+                          (_: unknown, index: number) => (
                             <Star
                               key={index}
                               size={14}
@@ -501,11 +558,35 @@ export default async function ProfessionalDashboardPage() {
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 py-2 shadow-2xl backdrop-blur md:hidden">
         <div className="grid grid-cols-5 gap-1">
-          <MobileNavItem href="/professional" label="Inicio" icon={<CalendarDays size={20} />} />
-          <MobileNavItem href="/professional/calendar/day" label="Día" icon={<CalendarClock size={20} />} />
-          <MobileNavItem href="/professional/appointments" label="Turnos" icon={<Clock3 size={20} />} />
-          <MobileNavItem href="/professional/messages" label="Mensajes" icon={<MessageCircle size={20} />} />
-          <MobileNavItem href="/professional/notifications" label="Avisos" icon={<Bell size={20} />} />
+          <MobileNavItem
+            href="/professional"
+            label="Inicio"
+            icon={<CalendarDays size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/calendar/day"
+            label="Día"
+            icon={<CalendarClock size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/appointments"
+            label="Turnos"
+            icon={<Clock3 size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/messages"
+            label="Mensajes"
+            icon={<MessageCircle size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/notifications"
+            label="Avisos"
+            icon={<Bell size={20} />}
+          />
         </div>
       </nav>
     </main>
@@ -588,26 +669,7 @@ function OperationalSection({
   title: string;
   description: string;
   emptyText: string;
-  appointments: {
-    id: string;
-    date: Date;
-    startTime: string;
-    endTime: string;
-    status: string;
-    service: {
-      title: string;
-      durationMinutes: number;
-    };
-    resource: {
-      name: string;
-    } | null;
-    client: {
-      user: {
-        name: string | null;
-        email: string;
-      };
-    };
-  }[];
+  appointments: DashboardAppointment[];
 }) {
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
@@ -630,7 +692,7 @@ function OperationalSection({
         <p className="mt-6 text-sm text-slate-500">{emptyText}</p>
       ) : (
         <div className="mt-6 space-y-4">
-          {appointments.map((appointment) => (
+          {appointments.map((appointment: DashboardAppointment) => (
             <article
               key={appointment.id}
               className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5"
@@ -688,6 +750,7 @@ function MobileNavItem({
       className="flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-bold text-slate-600 active:bg-blue-50 active:text-blue-700"
     >
       {icon}
+
       <span className="mt-1">{label}</span>
     </Link>
   );

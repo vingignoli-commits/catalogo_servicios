@@ -11,6 +11,19 @@ import {
 import { prisma } from "@/lib/db/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 
+type ConversationMessage = {
+  id: string;
+  senderId: string;
+  content: string;
+  createdAt: Date;
+  readAt: Date | null;
+  sender: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
+};
+
 function formatDate(date: Date) {
   return date.toLocaleString("es-AR", {
     day: "2-digit",
@@ -71,6 +84,8 @@ export default async function ProfessionalConversationPage({
   if (!conversation) {
     redirect("/professional/messages");
   }
+
+  const messages: ConversationMessage[] = conversation.messages;
 
   await prisma.message.updateMany({
     where: {
@@ -155,7 +170,8 @@ export default async function ProfessionalConversationPage({
     redirect(`/professional/messages/${validConversation.id}`);
   }
 
-  const clientName = conversation.client.user.name ?? conversation.client.user.email;
+  const clientName =
+    conversation.client.user.name ?? conversation.client.user.email;
 
   return (
     <main className="min-h-screen bg-slate-100 pb-24 text-slate-950 md:pb-0">
@@ -190,6 +206,7 @@ export default async function ProfessionalConversationPage({
         <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 p-5 sm:p-6">
             <h2 className="text-xl font-bold sm:text-2xl">Mensajes</h2>
+
             <p className="mt-1 text-sm text-slate-500">
               Los mensajes recibidos quedan marcados como leídos al abrir esta
               conversación.
@@ -197,18 +214,20 @@ export default async function ProfessionalConversationPage({
           </div>
 
           <div className="max-h-[62vh] space-y-4 overflow-y-auto p-4 sm:p-6">
-            {conversation.messages.length === 0 ? (
+            {messages.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
                 Todavía no hay mensajes.
               </p>
             ) : (
-              conversation.messages.map((message) => {
+              messages.map((message: ConversationMessage) => {
                 const isMine = message.senderId === user.id;
 
                 return (
                   <article
                     key={message.id}
-                    className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                    className={`flex ${
+                      isMine ? "justify-end" : "justify-start"
+                    }`}
                   >
                     <div
                       className={`max-w-[86%] rounded-3xl px-4 py-3 shadow-sm sm:max-w-[70%] ${
@@ -265,11 +284,35 @@ export default async function ProfessionalConversationPage({
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 py-2 shadow-2xl backdrop-blur md:hidden">
         <div className="grid grid-cols-5 gap-1">
-          <MobileNavItem href="/professional" label="Inicio" icon={<CalendarDays size={20} />} />
-          <MobileNavItem href="/professional/calendar/day" label="Día" icon={<CalendarClock size={20} />} />
-          <MobileNavItem href="/professional/appointments" label="Turnos" icon={<CalendarClock size={20} />} />
-          <MobileNavItem href="/professional/messages" label="Mensajes" icon={<MessageCircle size={20} />} />
-          <MobileNavItem href="/professional/notifications" label="Avisos" icon={<Bell size={20} />} />
+          <MobileNavItem
+            href="/professional"
+            label="Inicio"
+            icon={<CalendarDays size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/calendar/day"
+            label="Día"
+            icon={<CalendarClock size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/appointments"
+            label="Turnos"
+            icon={<CalendarClock size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/messages"
+            label="Mensajes"
+            icon={<MessageCircle size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/notifications"
+            label="Avisos"
+            icon={<Bell size={20} />}
+          />
         </div>
       </nav>
     </main>
@@ -291,6 +334,7 @@ function MobileNavItem({
       className="flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-bold text-slate-600 active:bg-blue-50 active:text-blue-700"
     >
       {icon}
+
       <span className="mt-1">{label}</span>
     </Link>
   );

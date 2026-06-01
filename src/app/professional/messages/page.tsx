@@ -10,6 +10,41 @@ import { prisma } from "@/lib/db/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { markProfessionalConversationAsUnreadAction } from "./actions";
 
+type ConversationMessage = {
+  id: string;
+  senderId: string;
+  content: string;
+  createdAt: Date;
+  readAt: Date | null;
+  sender: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
+};
+
+type ProfessionalConversationItem = {
+  id: string;
+  updatedAt: Date;
+  client: {
+    user: {
+      name: string | null;
+      email: string;
+    };
+  };
+  appointment: {
+    service: {
+      title: string;
+    };
+  } | null;
+  messages: ConversationMessage[];
+};
+
+type EnrichedProfessionalConversationItem = ProfessionalConversationItem & {
+  lastMessage: ConversationMessage | null;
+  unreadMessagesCount: number;
+};
+
 function formatDate(date: Date) {
   return date.toLocaleString("es-AR", {
     day: "2-digit",
@@ -34,6 +69,7 @@ export default async function ProfessionalMessagesPage() {
       <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-950 sm:px-6 sm:py-10">
         <section className="mx-auto max-w-3xl rounded-3xl border border-red-200 bg-white p-6 shadow-sm sm:p-8">
           <h1 className="text-2xl font-bold">Perfil profesional inexistente</h1>
+
           <p className="mt-2 text-sm text-red-600">
             Primero completá tu perfil profesional.
           </p>
@@ -42,49 +78,53 @@ export default async function ProfessionalMessagesPage() {
     );
   }
 
-  const conversations = await prisma.conversation.findMany({
-    where: {
-      professionalId: profile.id,
-    },
-    include: {
-      client: {
-        include: {
-          user: true,
+  const conversations: ProfessionalConversationItem[] =
+    await prisma.conversation.findMany({
+      where: {
+        professionalId: profile.id,
+      },
+      include: {
+        client: {
+          include: {
+            user: true,
+          },
+        },
+        appointment: {
+          include: {
+            service: true,
+          },
+        },
+        messages: {
+          orderBy: {
+            createdAt: "desc",
+          },
+          include: {
+            sender: true,
+          },
         },
       },
-      appointment: {
-        include: {
-          service: true,
-        },
+      orderBy: {
+        updatedAt: "desc",
       },
-      messages: {
-        orderBy: {
-          createdAt: "desc",
-        },
-        include: {
-          sender: true,
-        },
-      },
-    },
-    orderBy: {
-      updatedAt: "desc",
-    },
-  });
+    });
 
-  const enrichedConversations = conversations.map((conversation) => {
-    const unreadMessages = conversation.messages.filter(
-      (message) => message.senderId !== user.id && !message.readAt
-    );
+  const enrichedConversations: EnrichedProfessionalConversationItem[] =
+    conversations.map((conversation: ProfessionalConversationItem) => {
+      const unreadMessages = conversation.messages.filter(
+        (message: ConversationMessage) =>
+          message.senderId !== user.id && !message.readAt
+      );
 
-    return {
-      ...conversation,
-      lastMessage: conversation.messages[0] ?? null,
-      unreadMessagesCount: unreadMessages.length,
-    };
-  });
+      return {
+        ...conversation,
+        lastMessage: conversation.messages[0] ?? null,
+        unreadMessagesCount: unreadMessages.length,
+      };
+    });
 
   const unreadTotal = enrichedConversations.reduce(
-    (acc, conversation) => acc + conversation.unreadMessagesCount,
+    (acc: number, conversation: EnrichedProfessionalConversationItem) =>
+      acc + conversation.unreadMessagesCount,
     0
   );
 
@@ -134,6 +174,7 @@ export default async function ProfessionalMessagesPage() {
               <p className="text-xs font-bold uppercase tracking-wide text-blue-600 sm:text-sm">
                 Mensajes sin leer
               </p>
+
               <p className="text-3xl font-extrabold text-slate-950">
                 {unreadTotal}
               </p>
@@ -150,103 +191,107 @@ export default async function ProfessionalMessagesPage() {
             </p>
           ) : (
             <div className="mt-6 grid gap-4 sm:mt-8">
-              {enrichedConversations.map((conversation) => {
-                const hasUnread = conversation.unreadMessagesCount > 0;
-                const clientName =
-                  conversation.client.user.name ?? conversation.client.user.email;
+              {enrichedConversations.map(
+                (conversation: EnrichedProfessionalConversationItem) => {
+                  const hasUnread = conversation.unreadMessagesCount > 0;
+                  const clientName =
+                    conversation.client.user.name ??
+                    conversation.client.user.email;
 
-                return (
-                  <article
-                    key={conversation.id}
-                    className={`rounded-3xl border p-5 transition sm:p-6 ${
-                      hasUnread
-                        ? "border-blue-400 bg-blue-50 shadow-md"
-                        : "border-slate-200 bg-slate-50"
-                    }`}
-                  >
-                    <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-                      <Link
-                        href={`/professional/messages/${conversation.id}`}
-                        className="min-w-0 flex-1"
-                      >
-                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                          <h3
-                            className={`text-base sm:text-lg ${
-                              hasUnread
-                                ? "font-extrabold text-blue-950"
-                                : "font-bold text-slate-950"
-                            }`}
-                          >
-                            {clientName}
-                          </h3>
-
-                          {hasUnread ? (
-                            <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">
-                              {conversation.unreadMessagesCount} nuevo(s)
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-600">
-                              Leído
-                            </span>
-                          )}
-                        </div>
-
-                        <p className="mt-2 text-sm font-medium text-slate-500">
-                          {conversation.appointment?.service.title ??
-                            "Conversación"}
-                        </p>
-
-                        {conversation.lastMessage ? (
-                          <>
-                            <p
-                              className={`mt-4 line-clamp-2 text-sm ${
-                                hasUnread
-                                  ? "font-bold text-slate-950"
-                                  : "text-slate-600"
-                              }`}
-                            >
-                              {conversation.lastMessage.content}
-                            </p>
-
-                            <p className="mt-3 text-xs text-slate-400">
-                              {formatDate(conversation.lastMessage.createdAt)}
-                            </p>
-                          </>
-                        ) : null}
-                      </Link>
-
-                      <div className="flex w-full shrink-0 flex-col gap-2 md:w-[180px]">
+                  return (
+                    <article
+                      key={conversation.id}
+                      className={`rounded-3xl border p-5 transition sm:p-6 ${
+                        hasUnread
+                          ? "border-blue-400 bg-blue-50 shadow-md"
+                          : "border-slate-200 bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                         <Link
                           href={`/professional/messages/${conversation.id}`}
-                          className="rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-blue-700 md:py-2"
+                          className="min-w-0 flex-1"
                         >
-                          Abrir
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                            <h3
+                              className={`text-base sm:text-lg ${
+                                hasUnread
+                                  ? "font-extrabold text-blue-950"
+                                  : "font-bold text-slate-950"
+                              }`}
+                            >
+                              {clientName}
+                            </h3>
+
+                            {hasUnread ? (
+                              <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">
+                                {conversation.unreadMessagesCount} nuevo(s)
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-600">
+                                Leído
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="mt-2 text-sm font-medium text-slate-500">
+                            {conversation.appointment?.service.title ??
+                              "Conversación"}
+                          </p>
+
+                          {conversation.lastMessage ? (
+                            <>
+                              <p
+                                className={`mt-4 line-clamp-2 text-sm ${
+                                  hasUnread
+                                    ? "font-bold text-slate-950"
+                                    : "text-slate-600"
+                                }`}
+                              >
+                                {conversation.lastMessage.content}
+                              </p>
+
+                              <p className="mt-3 text-xs text-slate-400">
+                                {formatDate(conversation.lastMessage.createdAt)}
+                              </p>
+                            </>
+                          ) : null}
                         </Link>
 
-                        {!hasUnread && conversation.lastMessage ? (
-                          <form
-                            action={
-                              markProfessionalConversationAsUnreadAction
-                            }
+                        <div className="flex w-full shrink-0 flex-col gap-2 md:w-[180px]">
+                          <Link
+                            href={`/professional/messages/${conversation.id}`}
+                            className="rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-blue-700 md:py-2"
                           >
-                            <input
-                              type="hidden"
-                              name="conversationId"
-                              value={conversation.id}
-                            />
-                            <button
-                              type="submit"
-                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 md:py-2"
+                            Abrir
+                          </Link>
+
+                          {!hasUnread && conversation.lastMessage ? (
+                            <form
+                              action={
+                                markProfessionalConversationAsUnreadAction
+                              }
                             >
-                              Marcar no leído
-                            </button>
-                          </form>
-                        ) : null}
+                              <input
+                                type="hidden"
+                                name="conversationId"
+                                value={conversation.id}
+                              />
+
+                              <button
+                                type="submit"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 md:py-2"
+                              >
+                                Marcar no leído
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  </article>
-                );
-              })}
+                    </article>
+                  );
+                }
+              )}
             </div>
           )}
         </section>
@@ -254,11 +299,35 @@ export default async function ProfessionalMessagesPage() {
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 py-2 shadow-2xl backdrop-blur md:hidden">
         <div className="grid grid-cols-5 gap-1">
-          <MobileNavItem href="/professional" label="Inicio" icon={<CalendarDays size={20} />} />
-          <MobileNavItem href="/professional/calendar/day" label="Día" icon={<CalendarClock size={20} />} />
-          <MobileNavItem href="/professional/appointments" label="Turnos" icon={<CalendarClock size={20} />} />
-          <MobileNavItem href="/professional/messages" label="Mensajes" icon={<MessageCircle size={20} />} />
-          <MobileNavItem href="/professional/notifications" label="Avisos" icon={<Bell size={20} />} />
+          <MobileNavItem
+            href="/professional"
+            label="Inicio"
+            icon={<CalendarDays size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/calendar/day"
+            label="Día"
+            icon={<CalendarClock size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/appointments"
+            label="Turnos"
+            icon={<CalendarClock size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/messages"
+            label="Mensajes"
+            icon={<MessageCircle size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/notifications"
+            label="Avisos"
+            icon={<Bell size={20} />}
+          />
         </div>
       </nav>
     </main>
@@ -280,6 +349,7 @@ function MobileNavItem({
       className="flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-bold text-slate-600 active:bg-blue-50 active:text-blue-700"
     >
       {icon}
+
       <span className="mt-1">{label}</span>
     </Link>
   );

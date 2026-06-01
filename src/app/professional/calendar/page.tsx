@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { Ban, CheckCircle2, ChevronLeft, ChevronRight, Layers3, X } from "lucide-react";
+import {
+  Ban,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Layers3,
+  X,
+} from "lucide-react";
 
 import { prisma } from "@/lib/db/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
@@ -12,7 +19,10 @@ import {
 } from "@/app/professional/appointments/actions";
 
 const weekDays = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const visibleHours = Array.from({ length: 15 }).map((_, index) => index + 7);
+
+const visibleHours = Array.from({ length: 15 }).map(
+  (_: unknown, index: number) => index + 7
+);
 
 const START_HOUR = 7;
 const PIXELS_PER_MINUTE = 1.2;
@@ -27,6 +37,55 @@ const statusOptions = [
   { value: "CANCELLED_BY_CLIENT", label: "Cancelados por cliente" },
   { value: "CANCELLED_BY_PROFESSIONAL", label: "Cancelados por profesional" },
 ];
+
+type CalendarPageProps = {
+  searchParams: Promise<{
+    week?: string;
+    selected?: string;
+    blockId?: string;
+    slotKey?: string;
+    resourceId?: string;
+    status?: string;
+    success?: string;
+    error?: string;
+  }>;
+};
+
+type ResourceOption = {
+  id: string;
+  name: string;
+};
+
+type AppointmentData = {
+  id: string;
+  date: Date;
+  startTime: string;
+  endTime: string;
+  status: string;
+  service: {
+    title: string;
+    durationMinutes: number;
+  };
+  resource: {
+    name: string;
+  } | null;
+  client: {
+    user: {
+      name: string | null;
+      email: string;
+    };
+  };
+};
+
+type CalendarBlockData = {
+  id: string;
+  startDateTime: Date;
+  endDateTime: Date;
+  reason: string | null;
+  resource: {
+    name: string;
+  } | null;
+};
 
 function getStartOfWeek(date: Date) {
   const start = new Date(date);
@@ -183,50 +242,6 @@ function getBlockTimeForDay(block: CalendarBlockData, day: Date) {
   };
 }
 
-type CalendarPageProps = {
-  searchParams: Promise<{
-    week?: string;
-    selected?: string;
-    blockId?: string;
-    slotKey?: string;
-    resourceId?: string;
-    status?: string;
-    success?: string;
-    error?: string;
-  }>;
-};
-
-type AppointmentData = {
-  id: string;
-  date: Date;
-  startTime: string;
-  endTime: string;
-  status: string;
-  service: {
-    title: string;
-    durationMinutes: number;
-  };
-  resource: {
-    name: string;
-  } | null;
-  client: {
-    user: {
-      name: string | null;
-      email: string;
-    };
-  };
-};
-
-type CalendarBlockData = {
-  id: string;
-  startDateTime: Date;
-  endDateTime: Date;
-  reason: string | null;
-  resource: {
-    name: string;
-  } | null;
-};
-
 export default async function ProfessionalCalendarPage({
   searchParams,
 }: CalendarPageProps) {
@@ -266,6 +281,8 @@ export default async function ProfessionalCalendarPage({
     );
   }
 
+  const resources: ResourceOption[] = profile.resources;
+
   const selectedWeekDate = params.week
     ? new Date(`${params.week}T00:00:00`)
     : new Date();
@@ -274,14 +291,14 @@ export default async function ProfessionalCalendarPage({
   const weekEnd = addDays(weekStart, 6);
   weekEnd.setHours(23, 59, 59, 999);
 
-  const days = Array.from({ length: 7 }).map((_, index) =>
-    addDays(weekStart, index)
+  const days = Array.from({ length: 7 }).map(
+    (_: unknown, index: number) => addDays(weekStart, index)
   );
 
   const resourceId = params.resourceId ?? "ALL";
   const status = params.status ?? "ALL";
 
-  const appointments = await prisma.appointment.findMany({
+  const appointments: AppointmentData[] = await prisma.appointment.findMany({
     where: {
       professionalId: profile.id,
       date: {
@@ -311,39 +328,43 @@ export default async function ProfessionalCalendarPage({
     orderBy: [{ date: "asc" }, { startTime: "asc" }],
   });
 
-  const calendarBlocks = await prisma.calendarBlock.findMany({
-    where: {
-      professionalId: profile.id,
-      startDateTime: {
-        lte: weekEnd,
+  const calendarBlocks: CalendarBlockData[] =
+    await prisma.calendarBlock.findMany({
+      where: {
+        professionalId: profile.id,
+        startDateTime: {
+          lte: weekEnd,
+        },
+        endDateTime: {
+          gte: weekStart,
+        },
+        ...(resourceId !== "ALL"
+          ? resourceId === "GENERAL"
+            ? { resourceId: null }
+            : { resourceId }
+          : {}),
       },
-      endDateTime: {
-        gte: weekStart,
+      include: {
+        resource: true,
       },
-      ...(resourceId !== "ALL"
-        ? resourceId === "GENERAL"
-          ? { resourceId: null }
-          : { resourceId }
-        : {}),
-    },
-    include: {
-      resource: true,
-    },
-    orderBy: {
-      startDateTime: "asc",
-    },
-  });
+      orderBy: {
+        startDateTime: "asc",
+      },
+    });
 
   const selectedAppointment =
-    appointments.find((appointment) => appointment.id === params.selected) ??
-    null;
+    appointments.find(
+      (appointment: AppointmentData) => appointment.id === params.selected
+    ) ?? null;
 
   const selectedBlock =
-    calendarBlocks.find((block) => block.id === params.blockId) ?? null;
+    calendarBlocks.find(
+      (block: CalendarBlockData) => block.id === params.blockId
+    ) ?? null;
 
   const selectedSlotAppointments = params.slotKey
     ? appointments.filter(
-        (appointment) =>
+        (appointment: AppointmentData) =>
           getSlotKey(appointment.date, appointment.startTime) === params.slotKey
       )
     : [];
@@ -375,7 +396,9 @@ export default async function ProfessionalCalendarPage({
             <p className="text-sm font-bold uppercase tracking-wide text-blue-100">
               Profesional
             </p>
+
             <h1 className="mt-2 text-4xl font-extrabold">Agenda semanal</h1>
+
             <p className="mt-2 text-blue-100">
               Calendario visual con turnos, bloqueos y agrupación por horario.
             </p>
@@ -420,8 +443,10 @@ export default async function ProfessionalCalendarPage({
               <h2 className="text-xl font-bold">
                 {formatDateDDMMYYYY(weekStart)} — {formatDateDDMMYYYY(weekEnd)}
               </h2>
+
               <p className="mt-1 text-sm text-slate-500">
-                {appointments.length} turno(s) · {calendarBlocks.length} bloqueo(s)
+                {appointments.length} turno(s) · {calendarBlocks.length}{" "}
+                bloqueo(s)
               </p>
             </div>
 
@@ -468,7 +493,10 @@ export default async function ProfessionalCalendarPage({
             ) : null}
 
             <div>
-              <label className="text-sm font-bold text-slate-800">Recurso</label>
+              <label className="text-sm font-bold text-slate-800">
+                Recurso
+              </label>
+
               <select
                 name="resourceId"
                 defaultValue={resourceId}
@@ -476,7 +504,8 @@ export default async function ProfessionalCalendarPage({
               >
                 <option value="ALL">Todos los recursos</option>
                 <option value="GENERAL">Agenda general</option>
-                {profile.resources.map((resource) => (
+
+                {resources.map((resource: ResourceOption) => (
                   <option key={resource.id} value={resource.id}>
                     {resource.name}
                   </option>
@@ -485,17 +514,22 @@ export default async function ProfessionalCalendarPage({
             </div>
 
             <div>
-              <label className="text-sm font-bold text-slate-800">Estado</label>
+              <label className="text-sm font-bold text-slate-800">
+                Estado
+              </label>
+
               <select
                 name="status"
                 defaultValue={status}
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none ring-blue-500 focus:ring-2"
               >
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+                {statusOptions.map(
+                  (option: { value: string; label: string }) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  )
+                )}
               </select>
             </div>
 
@@ -538,7 +572,7 @@ export default async function ProfessionalCalendarPage({
               Hora
             </div>
 
-            {days.map((day) => {
+            {days.map((day: Date) => {
               const isToday = sameDate(day, today);
 
               return (
@@ -584,7 +618,7 @@ export default async function ProfessionalCalendarPage({
             }}
           >
             <div className="border-r border-slate-200 bg-slate-50">
-              {visibleHours.map((hour) => (
+              {visibleHours.map((hour: number) => (
                 <div
                   key={hour}
                   className="border-b border-slate-200 px-2 py-2 text-xs font-bold text-slate-400"
@@ -597,30 +631,35 @@ export default async function ProfessionalCalendarPage({
               ))}
             </div>
 
-            {days.map((day) => {
-              const dayAppointments = appointments.filter((appointment) =>
-                sameDate(appointment.date, day)
+            {days.map((day: Date) => {
+              const dayAppointments = appointments.filter(
+                (appointment: AppointmentData) =>
+                  sameDate(appointment.date, day)
               );
 
               const groupedAppointments = new Map<string, AppointmentData[]>();
 
               for (const appointment of dayAppointments) {
-                const slotKey = getSlotKey(appointment.date, appointment.startTime);
+                const slotKey = getSlotKey(
+                  appointment.date,
+                  appointment.startTime
+                );
                 const current = groupedAppointments.get(slotKey) ?? [];
                 current.push(appointment);
                 groupedAppointments.set(slotKey, current);
               }
 
-              const dayBlocks = calendarBlocks.filter((block) => {
-                return getBlockTimeForDay(block, day) !== null;
-              });
+              const dayBlocks = calendarBlocks.filter(
+                (block: CalendarBlockData) =>
+                  getBlockTimeForDay(block, day) !== null
+              );
 
               return (
                 <div
                   key={day.toISOString()}
                   className="relative border-r border-slate-100 last:border-r-0"
                 >
-                  {visibleHours.map((hour) => (
+                  {visibleHours.map((hour: number) => (
                     <div
                       key={hour}
                       className="border-b border-slate-100"
@@ -630,7 +669,7 @@ export default async function ProfessionalCalendarPage({
                     />
                   ))}
 
-                  {dayBlocks.map((block) => {
+                  {dayBlocks.map((block: CalendarBlockData) => {
                     const blockTime = getBlockTimeForDay(block, day);
 
                     if (!blockTime) return null;
@@ -674,7 +713,10 @@ export default async function ProfessionalCalendarPage({
                   })}
 
                   {Array.from(groupedAppointments.entries()).map(
-                    ([slotKey, slotAppointments]) => {
+                    ([slotKey, slotAppointments]: [
+                      string,
+                      AppointmentData[]
+                    ]) => {
                       const firstAppointment = slotAppointments[0];
                       const hasMultiple = slotAppointments.length > 1;
 
@@ -740,9 +782,11 @@ export default async function ProfessionalCalendarPage({
                             {firstAppointment.startTime}{" "}
                             {firstAppointment.service.title}
                           </p>
+
                           <p className="truncate text-[10px] opacity-80">
                             {getResourceLabel(firstAppointment.resource?.name)}
                           </p>
+
                           <p className="truncate text-[10px] opacity-70">
                             {firstAppointment.client.user.name ??
                               firstAppointment.client.user.email}
@@ -766,6 +810,7 @@ export default async function ProfessionalCalendarPage({
                 <p className="text-sm font-bold uppercase tracking-wide text-violet-600">
                   Turnos simultáneos
                 </p>
+
                 <h2 className="mt-2 text-2xl font-extrabold">
                   {selectedSlotAppointments[0].startTime} ·{" "}
                   {selectedSlotAppointments.length} reservas
@@ -781,53 +826,55 @@ export default async function ProfessionalCalendarPage({
             </div>
 
             <div className="mt-6 grid gap-4">
-              {selectedSlotAppointments.map((appointment) => (
-                <article
-                  key={appointment.id}
-                  className={`rounded-3xl border p-5 ${getCardClass(
-                    appointment.status
-                  )}`}
-                >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <h3 className="text-lg font-extrabold">
-                        {appointment.service.title}
-                      </h3>
+              {selectedSlotAppointments.map(
+                (appointment: AppointmentData) => (
+                  <article
+                    key={appointment.id}
+                    className={`rounded-3xl border p-5 ${getCardClass(
+                      appointment.status
+                    )}`}
+                  >
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <h3 className="text-lg font-extrabold">
+                          {appointment.service.title}
+                        </h3>
 
-                      <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                        <span className="rounded-full bg-white px-3 py-2 font-bold">
-                          {appointment.startTime} - {appointment.endTime}
-                        </span>
+                        <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                          <span className="rounded-full bg-white px-3 py-2 font-bold">
+                            {appointment.startTime} - {appointment.endTime}
+                          </span>
 
-                        <span className="rounded-full bg-white px-3 py-2 font-bold">
-                          {getResourceLabel(appointment.resource?.name)}
-                        </span>
+                          <span className="rounded-full bg-white px-3 py-2 font-bold">
+                            {getResourceLabel(appointment.resource?.name)}
+                          </span>
 
-                        <span className="rounded-full bg-white px-3 py-2 font-bold">
-                          {appointment.client.user.name ??
-                            appointment.client.user.email}
-                        </span>
+                          <span className="rounded-full bg-white px-3 py-2 font-bold">
+                            {appointment.client.user.name ??
+                              appointment.client.user.email}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <StatusBadge status={appointment.status} />
+
+                        <Link
+                          href={buildCalendarUrl({
+                            week: params.week,
+                            selected: appointment.id,
+                            resourceId,
+                            status,
+                          })}
+                          className="rounded-xl bg-blue-600 px-4 py-2 text-center text-sm font-black text-white"
+                        >
+                          Gestionar
+                        </Link>
                       </div>
                     </div>
-
-                    <div className="flex flex-col gap-2">
-                      <StatusBadge status={appointment.status} />
-
-                      <Link
-                        href={buildCalendarUrl({
-                          week: params.week,
-                          selected: appointment.id,
-                          resourceId,
-                          status,
-                        })}
-                        className="rounded-xl bg-blue-600 px-4 py-2 text-center text-sm font-black text-white"
-                      >
-                        Gestionar
-                      </Link>
-                    </div>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                )
+              )}
             </div>
           </section>
         </div>
@@ -841,6 +888,7 @@ export default async function ProfessionalCalendarPage({
                 <p className="text-sm font-bold uppercase tracking-wide text-blue-600">
                   Turno seleccionado
                 </p>
+
                 <h2 className="mt-2 text-2xl font-extrabold">
                   {selectedAppointment.service.title}
                 </h2>
@@ -863,10 +911,12 @@ export default async function ProfessionalCalendarPage({
                 label="Fecha"
                 value={formatDateDDMMYYYY(selectedAppointment.date)}
               />
+
               <Info
                 label="Horario"
                 value={`${selectedAppointment.startTime} - ${selectedAppointment.endTime}`}
               />
+
               <Info
                 label="Cliente"
                 value={
@@ -874,10 +924,12 @@ export default async function ProfessionalCalendarPage({
                   selectedAppointment.client.user.email
                 }
               />
+
               <Info
                 label="Recurso"
                 value={getResourceLabel(selectedAppointment.resource?.name)}
               />
+
               <Info
                 label="Duración"
                 value={`${selectedAppointment.service.durationMinutes} minutos`}
@@ -893,6 +945,7 @@ export default async function ProfessionalCalendarPage({
                       name="appointmentId"
                       value={selectedAppointment.id}
                     />
+
                     <input type="hidden" name="redirectTo" value={currentUrl} />
 
                     <button className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-black text-white">
@@ -911,7 +964,12 @@ export default async function ProfessionalCalendarPage({
                         name="appointmentId"
                         value={selectedAppointment.id}
                       />
-                      <input type="hidden" name="redirectTo" value={currentUrl} />
+
+                      <input
+                        type="hidden"
+                        name="redirectTo"
+                        value={currentUrl}
+                      />
 
                       <textarea
                         name="statusReason"
@@ -938,6 +996,7 @@ export default async function ProfessionalCalendarPage({
                       name="appointmentId"
                       value={selectedAppointment.id}
                     />
+
                     <input type="hidden" name="redirectTo" value={currentUrl} />
 
                     <button className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white">
@@ -951,6 +1010,7 @@ export default async function ProfessionalCalendarPage({
                       name="appointmentId"
                       value={selectedAppointment.id}
                     />
+
                     <input type="hidden" name="redirectTo" value={currentUrl} />
 
                     <button className="w-full rounded-xl border border-red-200 bg-white px-4 py-3 text-sm font-black text-red-700">
@@ -980,6 +1040,7 @@ export default async function ProfessionalCalendarPage({
                 <p className="text-sm font-bold uppercase tracking-wide text-red-600">
                   Bloqueo manual
                 </p>
+
                 <h2 className="mt-2 text-2xl font-extrabold">
                   Horario bloqueado
                 </h2>
@@ -998,14 +1059,17 @@ export default async function ProfessionalCalendarPage({
                 label="Inicio"
                 value={selectedBlock.startDateTime.toLocaleString("es-AR")}
               />
+
               <Info
                 label="Fin"
                 value={selectedBlock.endDateTime.toLocaleString("es-AR")}
               />
+
               <Info
                 label="Recurso"
                 value={getResourceLabel(selectedBlock.resource?.name)}
               />
+
               <Info
                 label="Motivo"
                 value={selectedBlock.reason ?? "Sin motivo informado"}
@@ -1033,6 +1097,7 @@ function Info({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
         {label}
       </p>
+
       <p className="mt-1 font-bold text-slate-950">{value}</p>
     </div>
   );

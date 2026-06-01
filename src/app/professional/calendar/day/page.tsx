@@ -20,7 +20,9 @@ import {
   rejectAppointmentAction,
 } from "@/app/professional/appointments/actions";
 
-const visibleHours = Array.from({ length: 15 }).map((_, index) => index + 7);
+const visibleHours = Array.from({ length: 15 }).map(
+  (_: unknown, index: number) => index + 7
+);
 
 const statusOptions = [
   { value: "ALL", label: "Todos" },
@@ -29,6 +31,52 @@ const statusOptions = [
   { value: "COMPLETED", label: "Completados" },
   { value: "REJECTED", label: "Rechazados" },
 ];
+
+type DayCalendarPageProps = {
+  searchParams: Promise<{
+    date?: string;
+    resourceId?: string;
+    status?: string;
+    success?: string;
+    error?: string;
+  }>;
+};
+
+type ResourceOption = {
+  id: string;
+  name: string;
+};
+
+type AppointmentData = {
+  id: string;
+  date: Date;
+  startTime: string;
+  endTime: string;
+  status: string;
+  service: {
+    title: string;
+    durationMinutes: number;
+  };
+  resource: {
+    name: string;
+  } | null;
+  client: {
+    user: {
+      name: string | null;
+      email: string;
+    };
+  };
+};
+
+type CalendarBlockData = {
+  id: string;
+  startDateTime: Date;
+  endDateTime: Date;
+  reason: string | null;
+  resource: {
+    name: string;
+  } | null;
+};
 
 function formatDateYYYYMMDD(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
@@ -124,47 +172,6 @@ function blockTouchesHour(
   return block.startDateTime < hourEnd && block.endDateTime > hourStart;
 }
 
-type DayCalendarPageProps = {
-  searchParams: Promise<{
-    date?: string;
-    resourceId?: string;
-    status?: string;
-    success?: string;
-    error?: string;
-  }>;
-};
-
-type AppointmentData = {
-  id: string;
-  date: Date;
-  startTime: string;
-  endTime: string;
-  status: string;
-  service: {
-    title: string;
-    durationMinutes: number;
-  };
-  resource: {
-    name: string;
-  } | null;
-  client: {
-    user: {
-      name: string | null;
-      email: string;
-    };
-  };
-};
-
-type CalendarBlockData = {
-  id: string;
-  startDateTime: Date;
-  endDateTime: Date;
-  reason: string | null;
-  resource: {
-    name: string;
-  } | null;
-};
-
 export default async function ProfessionalDayCalendarPage({
   searchParams,
 }: DayCalendarPageProps) {
@@ -204,6 +211,8 @@ export default async function ProfessionalDayCalendarPage({
     );
   }
 
+  const resources: ResourceOption[] = profile.resources;
+
   const selectedDate = params.date
     ? new Date(`${params.date}T00:00:00`)
     : new Date();
@@ -217,7 +226,7 @@ export default async function ProfessionalDayCalendarPage({
   const resourceId = params.resourceId ?? "ALL";
   const status = params.status ?? "ALL";
 
-  const appointments = await prisma.appointment.findMany({
+  const appointments: AppointmentData[] = await prisma.appointment.findMany({
     where: {
       professionalId: profile.id,
       date: {
@@ -247,28 +256,29 @@ export default async function ProfessionalDayCalendarPage({
     orderBy: [{ startTime: "asc" }],
   });
 
-  const calendarBlocks = await prisma.calendarBlock.findMany({
-    where: {
-      professionalId: profile.id,
-      startDateTime: {
-        lte: dayEnd,
+  const calendarBlocks: CalendarBlockData[] =
+    await prisma.calendarBlock.findMany({
+      where: {
+        professionalId: profile.id,
+        startDateTime: {
+          lte: dayEnd,
+        },
+        endDateTime: {
+          gte: dayStart,
+        },
+        ...(resourceId !== "ALL"
+          ? resourceId === "GENERAL"
+            ? { resourceId: null }
+            : { resourceId }
+          : {}),
       },
-      endDateTime: {
-        gte: dayStart,
+      include: {
+        resource: true,
       },
-      ...(resourceId !== "ALL"
-        ? resourceId === "GENERAL"
-          ? { resourceId: null }
-          : { resourceId }
-        : {}),
-    },
-    include: {
-      resource: true,
-    },
-    orderBy: {
-      startDateTime: "asc",
-    },
-  });
+      orderBy: {
+        startDateTime: "asc",
+      },
+    });
 
   const previousDay = addDays(selectedDate, -1);
   const nextDay = addDays(selectedDate, 1);
@@ -327,7 +337,8 @@ export default async function ProfessionalDayCalendarPage({
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h2 className="text-lg font-bold sm:text-xl">
-                {appointments.length} turno(s) · {calendarBlocks.length} bloqueo(s)
+                {appointments.length} turno(s) · {calendarBlocks.length}{" "}
+                bloqueo(s)
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
@@ -389,7 +400,7 @@ export default async function ProfessionalDayCalendarPage({
                 <option value="ALL">Todos los recursos</option>
                 <option value="GENERAL">Agenda general</option>
 
-                {profile.resources.map((resource) => (
+                {resources.map((resource: ResourceOption) => (
                   <option key={resource.id} value={resource.id}>
                     {resource.name}
                   </option>
@@ -407,7 +418,7 @@ export default async function ProfessionalDayCalendarPage({
                 defaultValue={status}
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none ring-blue-500 focus:ring-2"
               >
-                {statusOptions.map((option) => (
+                {statusOptions.map((option: { value: string; label: string }) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -449,13 +460,14 @@ export default async function ProfessionalDayCalendarPage({
         ) : null}
 
         <section className="mt-5 space-y-4">
-          {visibleHours.map((hour) => {
+          {visibleHours.map((hour: number) => {
             const hourAppointments = appointments.filter(
-              (appointment) => getHourFromTime(appointment.startTime) === hour
+              (appointment: AppointmentData) =>
+                getHourFromTime(appointment.startTime) === hour
             );
 
-            const hourBlocks = calendarBlocks.filter((block) =>
-              blockTouchesHour(block, hour)
+            const hourBlocks = calendarBlocks.filter(
+              (block: CalendarBlockData) => blockTouchesHour(block, hour)
             );
 
             const groupedAppointments = new Map<string, AppointmentData[]>();
@@ -486,12 +498,15 @@ export default async function ProfessionalDayCalendarPage({
                     </div>
                   ) : null}
 
-                  {hourBlocks.map((block) => (
+                  {hourBlocks.map((block: CalendarBlockData) => (
                     <CalendarBlockCard key={block.id} block={block} />
                   ))}
 
                   {Array.from(groupedAppointments.entries()).map(
-                    ([slotKey, slotAppointments]) => {
+                    ([slotKey, slotAppointments]: [
+                      string,
+                      AppointmentData[]
+                    ]) => {
                       if (slotAppointments.length > 1) {
                         return (
                           <section
@@ -516,13 +531,15 @@ export default async function ProfessionalDayCalendarPage({
                             </div>
 
                             <div className="mt-5 grid gap-4">
-                              {slotAppointments.map((appointment) => (
-                                <AppointmentCard
-                                  key={appointment.id}
-                                  appointment={appointment}
-                                  redirectTo={redirectTo}
-                                />
-                              ))}
+                              {slotAppointments.map(
+                                (appointment: AppointmentData) => (
+                                  <AppointmentCard
+                                    key={appointment.id}
+                                    appointment={appointment}
+                                    redirectTo={redirectTo}
+                                  />
+                                )
+                              )}
                             </div>
                           </section>
                         );
@@ -660,7 +677,12 @@ function AppointmentCard({
           {appointment.status === "REQUESTED" ? (
             <>
               <form action={acceptAppointmentAction}>
-                <input type="hidden" name="appointmentId" value={appointment.id} />
+                <input
+                  type="hidden"
+                  name="appointmentId"
+                  value={appointment.id}
+                />
+
                 <input type="hidden" name="redirectTo" value={redirectTo} />
 
                 <button className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-black text-white">
@@ -702,7 +724,12 @@ function AppointmentCard({
           {appointment.status === "ACCEPTED" ? (
             <>
               <form action={completeAppointmentAction}>
-                <input type="hidden" name="appointmentId" value={appointment.id} />
+                <input
+                  type="hidden"
+                  name="appointmentId"
+                  value={appointment.id}
+                />
+
                 <input type="hidden" name="redirectTo" value={redirectTo} />
 
                 <button className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white">
@@ -711,7 +738,12 @@ function AppointmentCard({
               </form>
 
               <form action={cancelAppointmentByProfessionalAction}>
-                <input type="hidden" name="appointmentId" value={appointment.id} />
+                <input
+                  type="hidden"
+                  name="appointmentId"
+                  value={appointment.id}
+                />
+
                 <input type="hidden" name="redirectTo" value={redirectTo} />
 
                 <button className="w-full rounded-xl border border-red-200 bg-white px-4 py-3 text-sm font-black text-red-700">

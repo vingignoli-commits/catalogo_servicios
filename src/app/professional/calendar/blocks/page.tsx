@@ -15,6 +15,21 @@ import {
   deleteCalendarBlockAction,
 } from "./actions";
 
+type CalendarResourceOption = {
+  id: string;
+  name: string;
+};
+
+type CalendarBlockItem = {
+  id: string;
+  startDateTime: Date;
+  endDateTime: Date;
+  reason: string | null;
+  resource: {
+    name: string;
+  } | null;
+};
+
 function formatDate(date: Date) {
   return date.toLocaleString("es-AR", {
     day: "2-digit",
@@ -62,7 +77,9 @@ export default async function CalendarBlocksPage({
     );
   }
 
-  const blocks = await prisma.calendarBlock.findMany({
+  const resources: CalendarResourceOption[] = professional.resources;
+
+  const blocks: CalendarBlockItem[] = await prisma.calendarBlock.findMany({
     where: {
       professionalId: professional.id,
     },
@@ -165,7 +182,7 @@ export default async function CalendarBlocksPage({
                 >
                   <option value="">Agenda general</option>
 
-                  {professional.resources.map((resource) => (
+                  {resources.map((resource: CalendarResourceOption) => (
                     <option key={resource.id} value={resource.id}>
                       {resource.name}
                     </option>
@@ -268,7 +285,7 @@ export default async function CalendarBlocksPage({
               </p>
             ) : (
               <div className="mt-6 space-y-4 sm:mt-8">
-                {blocks.map((block) => (
+                {blocks.map((block: CalendarBlockItem) => (
                   <article
                     key={block.id}
                     className="rounded-3xl border border-red-200 bg-red-50 p-5"
@@ -331,11 +348,35 @@ export default async function CalendarBlocksPage({
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 py-2 shadow-2xl backdrop-blur md:hidden">
         <div className="grid grid-cols-5 gap-1">
-          <MobileNavItem href="/professional" label="Inicio" icon={<CalendarDays size={20} />} />
-          <MobileNavItem href="/professional/calendar/day" label="Día" icon={<CalendarClock size={20} />} />
-          <MobileNavItem href="/professional/appointments" label="Turnos" icon={<CalendarClock size={20} />} />
-          <MobileNavItem href="/professional/messages" label="Mensajes" icon={<MessageCircle size={20} />} />
-          <MobileNavItem href="/professional/notifications" label="Avisos" icon={<Bell size={20} />} />
+          <MobileNavItem
+            href="/professional"
+            label="Inicio"
+            icon={<CalendarDays size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/calendar/day"
+            label="Día"
+            icon={<CalendarClock size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/appointments"
+            label="Turnos"
+            icon={<CalendarClock size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/messages"
+            label="Mensajes"
+            icon={<MessageCircle size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/notifications"
+            label="Avisos"
+            icon={<Bell size={20} />}
+          />
         </div>
       </nav>
     </main>
@@ -357,6 +398,7 @@ function MobileNavItem({
       className="flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-bold text-slate-600 active:bg-blue-50 active:text-blue-700"
     >
       {icon}
+
       <span className="mt-1">{label}</span>
     </Link>
   );
