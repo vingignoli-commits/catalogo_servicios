@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getAvailableSlots } from "@/lib/availability/slots";
 
 export default async function TestSlotsPage() {
@@ -13,3 +15,5 @@ export default async function TestSlotsPage() {
     </pre>
   );
 }
+
+

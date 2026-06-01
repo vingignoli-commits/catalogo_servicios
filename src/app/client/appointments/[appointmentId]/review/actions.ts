@@ -82,7 +82,15 @@ export async function createReviewAction(formData: FormData) {
   });
 
   const average =
-    reviews.reduce((acc, review) => acc + review.rating, 0) / reviews.length;
+    reviews.reduce(
+      (
+        acc: number,
+        review: {
+          rating: number;
+        }
+      ) => acc + review.rating,
+      0
+    ) / reviews.length;
 
   await prisma.professionalProfile.update({
     where: {

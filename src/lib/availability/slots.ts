@@ -28,20 +28,54 @@ function minutesToTime(minutes: number) {
   return `${hours}:${mins}`;
 }
 
-function overlaps(
-  startA: number,
-  endA: number,
-  startB: number,
-  endB: number
-) {
+function overlaps(startA: number, endA: number, startB: number, endB: number) {
   return startA < endB && endA > startB;
+}
+
+function getDayRange(date: Date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+
+  return { start, end };
+}
+
+function getBlockIntervalsForDate({
+  blocks,
+  date,
+}: {
+  blocks: {
+    startDateTime: Date;
+    endDateTime: Date;
+  }[];
+  date: Date;
+}) {
+  const { start: dayStart, end: dayEnd } = getDayRange(date);
+
+  return blocks
+    .filter((block) => {
+      return block.startDateTime < dayEnd && block.endDateTime > dayStart;
+    })
+    .map((block) => {
+      const effectiveStart =
+        block.startDateTime < dayStart ? dayStart : block.startDateTime;
+
+      const effectiveEnd =
+        block.endDateTime > dayEnd ? dayEnd : block.endDateTime;
+
+      return {
+        start: effectiveStart.getHours() * 60 + effectiveStart.getMinutes(),
+        end: effectiveEnd.getHours() * 60 + effectiveEnd.getMinutes(),
+      };
+    });
 }
 
 function generateSlotsFromBlocks({
   blocks,
   durationMinutes,
   occupied,
-  mode,
 }: {
   blocks: {
     startTime: string;
@@ -52,31 +86,12 @@ function generateSlotsFromBlocks({
     start: number;
     end: number;
   }[];
-  mode: "OPEN_HOURS" | "FIXED_SLOTS";
 }) {
   const slots: Slot[] = [];
 
   for (const block of blocks) {
     const blockStart = timeToMinutes(block.startTime);
     const blockEnd = timeToMinutes(block.endTime);
-
-    if (mode === "FIXED_SLOTS") {
-      const slotStart = blockStart;
-      const slotEnd = slotStart + durationMinutes;
-
-      const isTaken = occupied.some((occupiedSlot) =>
-        overlaps(slotStart, slotEnd, occupiedSlot.start, occupiedSlot.end)
-      );
-
-      if (!isTaken && slotEnd <= blockEnd) {
-        slots.push({
-          startTime: minutesToTime(slotStart),
-          endTime: minutesToTime(slotEnd),
-        });
-      }
-
-      continue;
-    }
 
     let current = blockStart;
 
@@ -152,20 +167,31 @@ export async function getAvailableSlots({
       dayOfWeek,
       isActive: true,
     },
+    orderBy: {
+      startTime: "asc",
+    },
   });
 
-  let blocks = availability.map((item) => ({
+  let availabilityBlocks = availability.map((item) => ({
     startTime: item.startTime,
     endTime: item.endTime,
   }));
 
   if (exception?.type === "CUSTOM_HOURS") {
-    blocks = [
+    if (!exception.startTime || !exception.endTime) {
+      return [];
+    }
+
+    availabilityBlocks = [
       {
-        startTime: exception.startTime!,
-        endTime: exception.endTime!,
+        startTime: exception.startTime,
+        endTime: exception.endTime,
       },
     ];
+  }
+
+  if (availabilityBlocks.length === 0) {
+    return [];
   }
 
   const appointments = await prisma.appointment.findMany({
@@ -178,16 +204,29 @@ export async function getAvailableSlots({
     },
   });
 
-  const occupied = appointments.map((appointment) => ({
+  const calendarBlocks = await prisma.calendarBlock.findMany({
+    where: {
+      professionalId,
+      resourceId: null,
+    },
+  });
+
+  const occupiedByAppointments = appointments.map((appointment) => ({
     start: timeToMinutes(appointment.startTime),
     end: timeToMinutes(appointment.endTime),
   }));
 
+  const occupiedByBlocks = getBlockIntervalsForDate({
+    blocks: calendarBlocks,
+    date,
+  });
+
+  const occupied = [...occupiedByAppointments, ...occupiedByBlocks];
+
   return generateSlotsFromBlocks({
-    blocks,
+    blocks: availabilityBlocks,
     durationMinutes: service.durationMinutes,
     occupied,
-    mode: professional.availabilityMode,
   });
 }
 
@@ -254,6 +293,13 @@ export async function getAvailableResourceSlots({
     return [];
   }
 
+  const globalCalendarBlocks = await prisma.calendarBlock.findMany({
+    where: {
+      professionalId,
+      resourceId: null,
+    },
+  });
+
   const slots: ResourceSlot[] = [];
 
   for (const resource of resources) {
@@ -267,21 +313,47 @@ export async function getAvailableResourceSlots({
       },
     });
 
-    const occupied = appointments.map((appointment) => ({
+    const resourceCalendarBlocks = await prisma.calendarBlock.findMany({
+      where: {
+        professionalId,
+        resourceId: resource.id,
+      },
+    });
+
+    const occupiedByAppointments = appointments.map((appointment) => ({
       start: timeToMinutes(appointment.startTime),
       end: timeToMinutes(appointment.endTime),
     }));
 
-    const blocks = resource.availability.map((availability) => ({
+    const occupiedByGlobalBlocks = getBlockIntervalsForDate({
+      blocks: globalCalendarBlocks,
+      date,
+    });
+
+    const occupiedByResourceBlocks = getBlockIntervalsForDate({
+      blocks: resourceCalendarBlocks,
+      date,
+    });
+
+    const occupied = [
+      ...occupiedByAppointments,
+      ...occupiedByGlobalBlocks,
+      ...occupiedByResourceBlocks,
+    ];
+
+    const availabilityBlocks = resource.availability.map((availability) => ({
       startTime: availability.startTime,
       endTime: availability.endTime,
     }));
 
+    if (availabilityBlocks.length === 0) {
+      continue;
+    }
+
     const resourceSlots = generateSlotsFromBlocks({
-      blocks,
+      blocks: availabilityBlocks,
       durationMinutes: service.durationMinutes,
       occupied,
-      mode: "OPEN_HOURS",
     });
 
     for (const slot of resourceSlots) {

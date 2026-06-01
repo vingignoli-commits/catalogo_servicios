@@ -3,17 +3,64 @@ import {
   Bell,
   BriefcaseBusiness,
   CalendarClock,
+  CalendarDays,
   Clock3,
   MessageCircle,
   Settings,
   Star,
-  UserRound,
   UsersRound,
 } from "lucide-react";
 
 import { prisma } from "@/lib/db/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { StatusBadge } from "@/components/ui/status-badge";
+
+type ActiveFlagItem = {
+  isActive: boolean;
+};
+
+type DashboardNotification = {
+  id: string;
+  title: string;
+  content: string | null;
+};
+
+type DashboardAppointment = {
+  id: string;
+  date: Date;
+  startTime: string;
+  endTime: string;
+  status: string;
+  service: {
+    title: string;
+    durationMinutes: number;
+  };
+  resource?: {
+    name: string;
+  } | null;
+  client: {
+    user: {
+      name: string | null;
+      email: string;
+    };
+  };
+};
+
+type DashboardReview = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  client: {
+    user: {
+      name: string | null;
+    };
+  };
+  appointment: {
+    service: {
+      title: string;
+    };
+  };
+};
 
 function formatDateDDMMYYYY(date: Date) {
   const day = String(date.getDate()).padStart(2, "0");
@@ -81,9 +128,10 @@ export default async function ProfessionalDashboardPage() {
 
   if (!profile) {
     return (
-      <main className="min-h-screen bg-slate-100 px-6 py-10 text-slate-950">
-        <section className="mx-auto max-w-3xl rounded-3xl border border-blue-100 bg-white p-8 shadow-xl shadow-blue-950/10">
+      <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-950 sm:px-6 sm:py-10">
+        <section className="mx-auto max-w-3xl rounded-3xl border border-blue-100 bg-white p-6 shadow-xl shadow-blue-950/10 sm:p-8">
           <h1 className="text-2xl font-bold">Completá tu perfil</h1>
+
           <p className="mt-2 max-w-2xl text-sm text-slate-500">
             Antes de publicar servicios o recibir turnos, necesitás crear tu
             perfil profesional.
@@ -91,7 +139,7 @@ export default async function ProfessionalDashboardPage() {
 
           <Link
             href="/professional/profile"
-            className="mt-6 inline-flex rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+            className="mt-6 inline-flex w-full justify-center rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700 sm:w-auto"
           >
             Crear perfil profesional
           </Link>
@@ -100,12 +148,17 @@ export default async function ProfessionalDashboardPage() {
     );
   }
 
-  const activeServicesCount = profile.services.filter(
-    (service) => service.isActive
+  const services: ActiveFlagItem[] = profile.services;
+  const resources: ActiveFlagItem[] = profile.resources;
+  const reviews: DashboardReview[] = profile.reviews;
+  const latestAppointments: DashboardAppointment[] = profile.appointments;
+
+  const activeServicesCount = services.filter(
+    (service: ActiveFlagItem) => service.isActive
   ).length;
 
-  const activeResourcesCount = profile.resources.filter(
-    (resource) => resource.isActive
+  const activeResourcesCount = resources.filter(
+    (resource: ActiveFlagItem) => resource.isActive
   ).length;
 
   const pendingAppointmentsCount = await prisma.appointment.count({
@@ -122,51 +175,53 @@ export default async function ProfessionalDashboardPage() {
     },
   });
 
-  const todayAppointments = await prisma.appointment.findMany({
-    where: {
-      professionalId: profile.id,
-      date: {
-        gte: start,
-        lte: end,
-      },
-      status: {
-        in: ["REQUESTED", "ACCEPTED"],
-      },
-    },
-    include: {
-      service: true,
-      resource: true,
-      client: {
-        include: {
-          user: true,
+  const todayAppointments: DashboardAppointment[] =
+    await prisma.appointment.findMany({
+      where: {
+        professionalId: profile.id,
+        date: {
+          gte: start,
+          lte: end,
+        },
+        status: {
+          in: ["REQUESTED", "ACCEPTED"],
         },
       },
-    },
-    orderBy: [{ startTime: "asc" }],
-  });
+      include: {
+        service: true,
+        resource: true,
+        client: {
+          include: {
+            user: true,
+          },
+        },
+      },
+      orderBy: [{ startTime: "asc" }],
+    });
 
-  const upcomingAppointments = await prisma.appointment.findMany({
-    where: {
-      professionalId: profile.id,
-      date: {
-        gt: end,
-      },
-      status: {
-        in: ["REQUESTED", "ACCEPTED"],
-      },
-    },
-    include: {
-      service: true,
-      resource: true,
-      client: {
-        include: {
-          user: true,
+  const upcomingAppointments: DashboardAppointment[] =
+    await prisma.appointment.findMany({
+      where: {
+        professionalId: profile.id,
+        date: {
+          gt: end,
+        },
+        status: {
+          in: ["REQUESTED", "ACCEPTED"],
         },
       },
-    },
-    orderBy: [{ date: "asc" }, { startTime: "asc" }],
-    take: 5,
-  });
+      include: {
+        service: true,
+        resource: true,
+        client: {
+          include: {
+            user: true,
+          },
+        },
+      },
+      orderBy: [{ date: "asc" }, { startTime: "asc" }],
+      take: 5,
+    });
 
   const unreadMessagesCount = await prisma.message.count({
     where: {
@@ -180,47 +235,57 @@ export default async function ProfessionalDashboardPage() {
     },
   });
 
-  const unreadNotifications = await prisma.notification.findMany({
-    where: {
-      userId: user.id,
-      readAt: null,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 5,
-  });
+  const unreadNotifications: DashboardNotification[] =
+    await prisma.notification.findMany({
+      where: {
+        userId: user.id,
+        readAt: null,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 5,
+    });
 
-  const lastAppointment = profile.appointments[0] ?? null;
+  const lastAppointment = latestAppointments[0] ?? null;
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-950">
-      <section className="bg-blue-600 px-6 py-12 text-white">
+    <main className="min-h-screen bg-slate-100 pb-24 text-slate-950 md:pb-0">
+      <section className="bg-blue-600 px-4 py-8 text-white sm:px-6 sm:py-12">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-wide text-blue-100">
+            <p className="text-xs font-bold uppercase tracking-wide text-blue-100 sm:text-sm">
               Panel profesional
             </p>
-            <h1 className="mt-3 text-4xl font-extrabold">
+
+            <h1 className="mt-3 text-3xl font-extrabold sm:text-4xl">
               Operación diaria
             </h1>
-            <p className="mt-3 max-w-2xl text-blue-100">
-              Turnos, solicitudes, mensajes, reputación y acciones rápidas en
-              una sola pantalla.
+
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-blue-100 sm:text-base">
+              Turnos, agenda, solicitudes, mensajes, reputación y acciones
+              rápidas.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
+            <Link
+              href="/professional/calendar"
+              className="rounded-xl bg-white px-5 py-3 text-center text-sm font-bold text-blue-600 shadow-lg transition hover:bg-blue-50"
+            >
+              Abrir agenda
+            </Link>
+
             <Link
               href={`/professionals/${profile.id}`}
-              className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-blue-600 shadow-lg transition hover:bg-blue-50"
+              className="rounded-xl border border-blue-300 px-5 py-3 text-center text-sm font-bold text-white transition hover:bg-blue-700"
             >
               Ver perfil público
             </Link>
 
             <Link
               href="/logout"
-              className="rounded-xl border border-blue-300 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+              className="rounded-xl border border-blue-300 px-5 py-3 text-center text-sm font-bold text-white transition hover:bg-blue-700"
             >
               Salir
             </Link>
@@ -228,8 +293,8 @@ export default async function ProfessionalDashboardPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-10">
-        <div className="-mt-20 grid gap-5 md:grid-cols-5">
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:-mt-20 sm:gap-5 md:grid-cols-5">
           <MetricCard
             label="Solicitudes"
             value={pendingAppointmentsCount}
@@ -265,99 +330,58 @@ export default async function ProfessionalDashboardPage() {
         </div>
 
         {unreadNotifications.length > 0 ? (
-          <section className="mt-8 rounded-3xl border border-blue-200 bg-blue-50 p-6">
+          <section className="mt-6 rounded-3xl border border-blue-200 bg-blue-50 p-5 sm:mt-8 sm:p-6">
             <div className="flex items-center gap-3 text-blue-700">
               <Bell size={22} />
-              <h2 className="text-xl font-bold text-blue-950">
+              <h2 className="text-lg font-bold text-blue-950 sm:text-xl">
                 Notificaciones pendientes
               </h2>
             </div>
 
             <div className="mt-5 grid gap-3">
-              {unreadNotifications.map((notification) => (
-                <Link
-                  key={notification.id}
-                  href={notification.actionUrl ?? "/professional"}
-                  className="rounded-2xl border border-blue-100 bg-white p-4 transition hover:border-blue-300"
-                >
-                  <p className="font-bold text-slate-950">
-                    {notification.title}
-                  </p>
-                  {notification.content ? (
-                    <p className="mt-1 text-sm text-slate-600">
-                      {notification.content}
+              {unreadNotifications.map(
+                (notification: DashboardNotification) => (
+                  <Link
+                    key={notification.id}
+                    href="/professional/notifications"
+                    className="rounded-2xl border border-blue-100 bg-white p-4 transition hover:border-blue-300"
+                  >
+                    <p className="font-bold text-slate-950">
+                      {notification.title}
                     </p>
-                  ) : null}
-                </Link>
-              ))}
+
+                    {notification.content ? (
+                      <p className="mt-1 text-sm text-slate-600">
+                        {notification.content}
+                      </p>
+                    ) : null}
+                  </Link>
+                )
+              )}
             </div>
           </section>
         ) : null}
 
-        {pendingAppointmentsCount > 0 ? (
-          <section className="mt-8 rounded-3xl border border-amber-200 bg-amber-50 p-6">
-            <h2 className="text-xl font-bold text-amber-900">
-              Tenés {pendingAppointmentsCount} solicitud(es) esperando respuesta
-            </h2>
-            <p className="mt-2 text-sm text-amber-800">
-              Aceptar o rechazar rápido mejora conversión y confianza. El
-              silencio es una respuesta, pero de las malas.
-            </p>
-
-            <Link
-              href="/professional/appointments"
-              className="mt-4 inline-flex rounded-xl bg-amber-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-amber-700"
-            >
-              Gestionar solicitudes
-            </Link>
-          </section>
-        ) : null}
-
-        {unreadMessagesCount > 0 ? (
-          <section className="mt-8 rounded-3xl border border-blue-200 bg-blue-50 p-6">
-            <h2 className="text-xl font-bold text-blue-900">
-              Tenés {unreadMessagesCount} mensaje(s) sin leer
-            </h2>
-            <p className="mt-2 text-sm text-blue-700">
-              Revisá conversaciones con clientes vinculadas a turnos.
-            </p>
-
-            <Link
-              href="/professional/messages"
-              className="mt-4 inline-flex rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
-            >
-              Ver mensajes
-            </Link>
-          </section>
-        ) : null}
-
-        <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-7">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-9">
           <DashboardAction
-            href="/professional/profile"
-            icon={<UserRound size={24} />}
-            title="Perfil"
-            description="Datos públicos."
+            href="/professional/calendar"
+            icon={<CalendarDays size={24} />}
+            title="Agenda"
+            description="Calendario semanal."
           />
 
           <DashboardAction
-            href="/professional/services"
-            icon={<BriefcaseBusiness size={24} />}
-            title="Servicios"
-            description="Oferta comercial."
-          />
-
-          <DashboardAction
-            href="/professional/resources"
-            icon={<UsersRound size={24} />}
-            title="Recursos"
-            description="Personas o salas."
+            href="/professional/calendar/day"
+            icon={<CalendarClock size={24} />}
+            title="Día"
+            description="Operar agenda diaria."
           />
 
           <DashboardAction
             href="/professional/availability"
             icon={<Clock3 size={24} />}
-            title="Agenda"
-            description="Horarios generales."
+            title="Disponibilidad"
+            description="Reglas de horarios."
           />
 
           <DashboardAction
@@ -375,6 +399,27 @@ export default async function ProfessionalDashboardPage() {
           />
 
           <DashboardAction
+            href="/professional/notifications"
+            icon={<Bell size={24} />}
+            title="Notificaciones"
+            description={`${unreadNotifications.length} sin leer.`}
+          />
+
+          <DashboardAction
+            href="/professional/services"
+            icon={<BriefcaseBusiness size={24} />}
+            title="Servicios"
+            description="Oferta comercial."
+          />
+
+          <DashboardAction
+            href="/professional/resources"
+            icon={<UsersRound size={24} />}
+            title="Recursos"
+            description="Personas o salas."
+          />
+
+          <DashboardAction
             href="/professional/reviews"
             icon={<Star size={24} />}
             title="Reseñas"
@@ -382,8 +427,8 @@ export default async function ProfessionalDashboardPage() {
           />
         </div>
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_420px]">
-          <section className="space-y-8">
+        <div className="mt-6 grid gap-6 sm:mt-8 lg:grid-cols-[1fr_420px] lg:gap-8">
+          <section className="space-y-6 sm:space-y-8">
             <OperationalSection
               title="Turnos de hoy"
               description="Lo que requiere atención inmediata."
@@ -399,9 +444,11 @@ export default async function ProfessionalDashboardPage() {
             />
           </section>
 
-          <aside className="space-y-8">
-            <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-              <h2 className="text-2xl font-bold">Último movimiento</h2>
+          <aside className="space-y-6 sm:space-y-8">
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+              <h2 className="text-xl font-bold sm:text-2xl">
+                Último movimiento
+              </h2>
 
               {!lastAppointment ? (
                 <p className="mt-3 text-sm text-slate-500">
@@ -430,10 +477,13 @@ export default async function ProfessionalDashboardPage() {
               )}
             </section>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl font-bold">Últimas reseñas</h2>
+                  <h2 className="text-xl font-bold sm:text-2xl">
+                    Últimas reseñas
+                  </h2>
+
                   <p className="mt-1 text-sm text-slate-500">
                     Señales de confianza pública.
                   </p>
@@ -447,20 +497,20 @@ export default async function ProfessionalDashboardPage() {
                 </Link>
               </div>
 
-              {profile.reviews.length === 0 ? (
+              {reviews.length === 0 ? (
                 <p className="mt-6 text-sm text-slate-500">
                   Todavía no recibiste reseñas.
                 </p>
               ) : (
                 <div className="mt-6 space-y-4">
-                  {profile.reviews.map((review) => (
+                  {reviews.map((review: DashboardReview) => (
                     <article
                       key={review.id}
                       className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
                     >
                       <div className="flex items-center gap-1 text-amber-500">
                         {Array.from({ length: review.rating }).map(
-                          (_, index) => (
+                          (_: unknown, index: number) => (
                             <Star
                               key={index}
                               size={14}
@@ -484,20 +534,20 @@ export default async function ProfessionalDashboardPage() {
               )}
             </section>
 
-            <section className="rounded-3xl border border-blue-100 bg-blue-50 p-8">
+            <section className="rounded-3xl border border-blue-100 bg-blue-50 p-6 sm:p-8">
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white">
                   <Settings size={24} />
                 </div>
 
                 <div>
-                  <h2 className="text-xl font-bold text-slate-950">
-                    Próximo salto
+                  <h2 className="text-lg font-bold text-slate-950 sm:text-xl">
+                    Diferencia clave
                   </h2>
+
                   <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                    El siguiente módulo lógico es calendario visual semanal con
-                    turnos ocupados, libres y excepciones. Ahí la agenda deja de
-                    ser abstracta.
+                    Agenda muestra turnos reales. Disponibilidad configura las
+                    reglas.
                   </p>
                 </div>
               </div>
@@ -505,6 +555,40 @@ export default async function ProfessionalDashboardPage() {
           </aside>
         </div>
       </section>
+
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 py-2 shadow-2xl backdrop-blur md:hidden">
+        <div className="grid grid-cols-5 gap-1">
+          <MobileNavItem
+            href="/professional"
+            label="Inicio"
+            icon={<CalendarDays size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/calendar/day"
+            label="Día"
+            icon={<CalendarClock size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/appointments"
+            label="Turnos"
+            icon={<Clock3 size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/messages"
+            label="Mensajes"
+            icon={<MessageCircle size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/notifications"
+            label="Avisos"
+            icon={<Bell size={20} />}
+          />
+        </div>
+      </nav>
     </main>
   );
 }
@@ -522,21 +606,27 @@ function MetricCard({
 }) {
   return (
     <article
-      className={`rounded-3xl border p-6 shadow-xl shadow-blue-950/10 ${
+      className={`rounded-3xl border p-4 shadow-xl shadow-blue-950/10 sm:p-6 ${
         highlight
           ? "border-amber-200 bg-amber-50"
           : "border-blue-100 bg-white"
       }`}
     >
       <p
-        className={`text-sm font-bold uppercase tracking-wide ${
+        className={`text-[11px] font-bold uppercase tracking-wide sm:text-sm ${
           highlight ? "text-amber-700" : "text-blue-600"
         }`}
       >
         {label}
       </p>
-      <p className="mt-3 text-4xl font-extrabold text-slate-950">{value}</p>
-      <p className="mt-2 text-sm text-slate-500">{description}</p>
+
+      <p className="mt-2 text-3xl font-extrabold text-slate-950 sm:mt-3 sm:text-4xl">
+        {value}
+      </p>
+
+      <p className="mt-1 text-xs text-slate-500 sm:mt-2 sm:text-sm">
+        {description}
+      </p>
     </article>
   );
 }
@@ -555,14 +645,15 @@ function DashboardAction({
   return (
     <Link
       href={href}
-      className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-blue-300 hover:shadow-xl"
+      className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-blue-300 hover:shadow-xl sm:p-5"
     >
-      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white sm:mb-4 sm:h-11 sm:w-11">
         {icon}
       </div>
 
-      <h2 className="text-base font-bold text-slate-950">{title}</h2>
-      <p className="mt-2 text-sm leading-relaxed text-slate-500">
+      <h2 className="text-sm font-bold text-slate-950 sm:text-base">{title}</h2>
+
+      <p className="mt-1 text-xs leading-relaxed text-slate-500 sm:mt-2 sm:text-sm">
         {description}
       </p>
     </Link>
@@ -578,40 +669,22 @@ function OperationalSection({
   title: string;
   description: string;
   emptyText: string;
-  appointments: {
-    id: string;
-    date: Date;
-    startTime: string;
-    endTime: string;
-    status: string;
-    service: {
-      title: string;
-      durationMinutes: number;
-    };
-    resource: {
-      name: string;
-    } | null;
-    client: {
-      user: {
-        name: string | null;
-        email: string;
-      };
-    };
-  }[];
+  appointments: DashboardAppointment[];
 }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold">{title}</h2>
+          <h2 className="text-xl font-bold sm:text-2xl">{title}</h2>
+
           <p className="mt-1 text-sm text-slate-500">{description}</p>
         </div>
 
         <Link
-          href="/professional/appointments"
+          href="/professional/calendar"
           className="text-sm font-bold text-blue-600 hover:text-blue-700"
         >
-          Ver turnos
+          Ver agenda
         </Link>
       </div>
 
@@ -619,12 +692,12 @@ function OperationalSection({
         <p className="mt-6 text-sm text-slate-500">{emptyText}</p>
       ) : (
         <div className="mt-6 space-y-4">
-          {appointments.map((appointment) => (
+          {appointments.map((appointment: DashboardAppointment) => (
             <article
               key={appointment.id}
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+              className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5"
             >
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h3 className="font-bold text-slate-950">
                     {appointment.service.title}
@@ -636,14 +709,18 @@ function OperationalSection({
                       appointment.client.user.email}
                   </p>
 
-                  <div className="mt-3 flex flex-wrap gap-3 text-sm text-slate-600">
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600 sm:gap-3 sm:text-sm">
                     <span>{formatDateDDMMYYYY(appointment.date)}</span>
+
                     <span>
                       {appointment.startTime} - {appointment.endTime}
                     </span>
+
                     <span>{appointment.service.durationMinutes} min</span>
+
                     <span>
-                      Recurso: {appointment.resource?.name ?? "Agenda general"}
+                      Recurso:{" "}
+                      {appointment.resource?.name ?? "Agenda general"}
                     </span>
                   </div>
                 </div>
@@ -655,5 +732,26 @@ function OperationalSection({
         </div>
       )}
     </section>
+  );
+}
+
+function MobileNavItem({
+  href,
+  icon,
+  label,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-bold text-slate-600 active:bg-blue-50 active:text-blue-700"
+    >
+      {icon}
+
+      <span className="mt-1">{label}</span>
+    </Link>
   );
 }

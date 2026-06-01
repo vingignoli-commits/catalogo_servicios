@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/db/prisma";
 
 export default async function DatabaseHealthPage() {

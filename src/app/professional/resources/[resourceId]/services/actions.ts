@@ -6,6 +6,10 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 
+type OwnedServiceItem = {
+  id: string;
+};
+
 async function getCurrentProfessionalProfile() {
   const user = await requireRole(["PROFESSIONAL"]);
 
@@ -47,9 +51,9 @@ export async function updateResourceServicesAction(
 
   const selectedServiceIds = formData
     .getAll("serviceIds")
-    .map((value) => String(value));
+    .map((value: FormDataEntryValue) => String(value));
 
-  const ownedServices = await prisma.service.findMany({
+  const ownedServices: OwnedServiceItem[] = await prisma.service.findMany({
     where: {
       professionalId: profile.id,
       id: {
@@ -61,7 +65,9 @@ export async function updateResourceServicesAction(
     },
   });
 
-  const validServiceIds = ownedServices.map((service) => service.id);
+  const validServiceIds = ownedServices.map(
+    (service: OwnedServiceItem) => service.id
+  );
 
   await prisma.resourceService.deleteMany({
     where: {
@@ -71,7 +77,7 @@ export async function updateResourceServicesAction(
 
   if (validServiceIds.length > 0) {
     await prisma.resourceService.createMany({
-      data: validServiceIds.map((serviceId) => ({
+      data: validServiceIds.map((serviceId: string) => ({
         resourceId: resource.id,
         serviceId,
       })),

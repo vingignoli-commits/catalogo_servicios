@@ -6,6 +6,25 @@ import { requireRole } from "@/lib/auth/get-current-user";
 
 import { replyReviewAction } from "./actions";
 
+type ReviewItem = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  professionalReply: string | null;
+  createdAt: Date;
+  client: {
+    user: {
+      name: string | null;
+      email: string;
+    };
+  };
+  appointment: {
+    service: {
+      title: string;
+    };
+  };
+};
+
 function formatDateDDMMYYYY(date: Date) {
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -15,7 +34,7 @@ function formatDateDDMMYYYY(date: Date) {
 }
 
 function renderStars(rating: number) {
-  return Array.from({ length: 5 }).map((_, index) => (
+  return Array.from({ length: 5 }).map((_: unknown, index: number) => (
     <Star
       key={index}
       size={16}
@@ -61,7 +80,7 @@ export default async function ProfessionalReviewsPage({
     );
   }
 
-  const reviews = await prisma.review.findMany({
+  const reviews: ReviewItem[] = await prisma.review.findMany({
     where: {
       professionalId: professional.id,
     },
@@ -81,6 +100,10 @@ export default async function ProfessionalReviewsPage({
       createdAt: "desc",
     },
   });
+
+  const answeredReviewsCount = reviews.filter(
+    (review: ReviewItem) => Boolean(review.professionalReply)
+  ).length;
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
@@ -145,20 +168,14 @@ export default async function ProfessionalReviewsPage({
             </p>
 
             <p className="mt-3 text-4xl font-extrabold text-slate-950">
-              {
-                reviews.filter(
-                  (review) => review.professionalReply
-                ).length
-              }
+              {answeredReviewsCount}
             </p>
           </article>
         </section>
 
         <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
           <div>
-            <h2 className="text-2xl font-bold">
-              Opiniones verificadas
-            </h2>
+            <h2 className="text-2xl font-bold">Opiniones verificadas</h2>
 
             <p className="mt-2 text-sm text-slate-500">
               Solo pueden opinar clientes que completaron un turno.
@@ -171,7 +188,7 @@ export default async function ProfessionalReviewsPage({
             </p>
           ) : (
             <div className="mt-8 space-y-6">
-              {reviews.map((review) => (
+              {reviews.map((review: ReviewItem) => (
                 <article
                   key={review.id}
                   className="rounded-3xl border border-slate-200 bg-slate-50 p-6"
@@ -183,8 +200,7 @@ export default async function ProfessionalReviewsPage({
                       </div>
 
                       <h3 className="mt-4 text-lg font-bold text-slate-950">
-                        {review.client.user.name ??
-                          review.client.user.user.email}
+                        {review.client.user.name ?? review.client.user.email}
                       </h3>
 
                       <p className="mt-1 text-sm text-slate-500">
@@ -195,9 +211,15 @@ export default async function ProfessionalReviewsPage({
                         {formatDateDDMMYYYY(review.createdAt)}
                       </p>
 
-                      <p className="mt-5 leading-relaxed text-slate-700">
-                        {review.comment}
-                      </p>
+                      {review.comment ? (
+                        <p className="mt-5 leading-relaxed text-slate-700">
+                          {review.comment}
+                        </p>
+                      ) : (
+                        <p className="mt-5 text-sm text-slate-400">
+                          Sin comentario escrito.
+                        </p>
+                      )}
                     </div>
 
                     <div className="rounded-full bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700">
@@ -216,15 +238,8 @@ export default async function ProfessionalReviewsPage({
                       </p>
                     </div>
                   ) : (
-                    <form
-                      action={replyReviewAction}
-                      className="mt-6 space-y-4"
-                    >
-                      <input
-                        type="hidden"
-                        name="reviewId"
-                        value={review.id}
-                      />
+                    <form action={replyReviewAction} className="mt-6 space-y-4">
+                      <input type="hidden" name="reviewId" value={review.id} />
 
                       <div>
                         <label className="text-sm font-bold text-slate-800">

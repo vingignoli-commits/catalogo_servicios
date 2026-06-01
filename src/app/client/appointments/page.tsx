@@ -1,9 +1,49 @@
 import Link from "next/link";
+import {
+  Bell,
+  CalendarDays,
+  CheckCircle2,
+  MessageCircle,
+  Search,
+  Star,
+} from "lucide-react";
 
 import { prisma } from "@/lib/db/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
-import { cancelAppointmentByClientAction } from "./actions";
 import { StatusBadge } from "@/components/ui/status-badge";
+
+type AppointmentCardData = {
+  id: string;
+  date: Date;
+  startTime: string;
+  endTime: string;
+  status: string;
+  statusReason: string | null;
+  service: {
+    title: string;
+    durationMinutes: number;
+  };
+  resource: {
+    name: string;
+    type: string;
+  } | null;
+  professional: {
+    id: string;
+    user: {
+      name: string | null;
+      email: string;
+    };
+  };
+  conversation: {
+    id: string;
+    messages: {
+      id: string;
+    }[];
+  } | null;
+  reviews: {
+    id: string;
+  }[];
+};
 
 function formatDateDDMMYYYY(date: Date) {
   const day = String(date.getDate()).padStart(2, "0");
@@ -13,22 +53,27 @@ function formatDateDDMMYYYY(date: Date) {
   return `${day}/${month}/${year}`;
 }
 
-function canCancelAppointment(date: Date, status: string) {
-  if (!["REQUESTED", "ACCEPTED"].includes(status)) {
-    return false;
+function getCardClass(status: string) {
+  if (status === "REQUESTED") return "border-amber-300 bg-amber-50";
+  if (status === "ACCEPTED") return "border-blue-300 bg-blue-50";
+  if (status === "COMPLETED") return "border-emerald-300 bg-emerald-50";
+
+  if (
+    status === "REJECTED" ||
+    status === "CANCELLED_BY_CLIENT" ||
+    status === "CANCELLED_BY_PROFESSIONAL"
+  ) {
+    return "border-red-200 bg-red-50";
   }
 
-  const now = new Date();
-  const hoursUntilAppointment =
-    (date.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-  return hoursUntilAppointment >= 24;
+  return "border-slate-200 bg-slate-50";
 }
 
 export default async function ClientAppointmentsPage({
   searchParams,
 }: {
   searchParams: Promise<{
+    success?: string;
     error?: string;
   }>;
 }) {
@@ -43,118 +88,221 @@ export default async function ClientAppointmentsPage({
 
   if (!clientProfile) {
     return (
-      <main className="min-h-screen bg-slate-100 px-6 py-10 text-slate-950">
-        <section className="mx-auto max-w-3xl rounded-3xl border border-red-200 bg-white p-8 shadow-sm">
+      <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-950 sm:px-6 sm:py-10">
+        <section className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <h1 className="text-2xl font-bold">Perfil de cliente inexistente</h1>
-          <p className="mt-2 text-sm text-red-600">
-            Tu usuario no tiene perfil de cliente asociado.
+          <p className="mt-2 text-sm text-slate-500">
+            No se encontró tu perfil de cliente.
           </p>
+
+          <Link
+            href="/client"
+            className="mt-6 inline-flex w-full justify-center rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white sm:w-auto"
+          >
+            Volver al panel
+          </Link>
         </section>
       </main>
     );
   }
 
-  const appointments = await prisma.appointment.findMany({
+  const appointments: AppointmentCardData[] = await prisma.appointment.findMany({
     where: {
       clientId: clientProfile.id,
     },
     include: {
       service: true,
+      resource: true,
+      conversation: {
+        include: {
+          messages: {
+            where: {
+              senderId: {
+                not: user.id,
+              },
+              readAt: null,
+            },
+          },
+        },
+      },
+      reviews: true,
       professional: {
         include: {
           user: true,
-        },
-      },
-      reviews: {
-        where: {
-          clientId: clientProfile.id,
         },
       },
     },
     orderBy: [{ date: "desc" }, { startTime: "desc" }],
   });
 
-  const activeAppointments = appointments.filter((appointment) =>
-    ["REQUESTED", "ACCEPTED"].includes(appointment.status)
+  const activeAppointments = appointments.filter(
+    (appointment: AppointmentCardData) =>
+      ["REQUESTED", "ACCEPTED"].includes(appointment.status)
+  );
+
+  const reviewableAppointments = appointments.filter(
+    (appointment: AppointmentCardData) =>
+      appointment.status === "COMPLETED" && appointment.reviews.length === 0
   );
 
   const historicalAppointments = appointments.filter(
-    (appointment) => !["REQUESTED", "ACCEPTED"].includes(appointment.status)
+    (appointment: AppointmentCardData) =>
+      !["REQUESTED", "ACCEPTED"].includes(appointment.status)
+  );
+
+  const unreadMessagesCount = appointments.reduce(
+    (acc: number, appointment: AppointmentCardData) => {
+      return acc + (appointment.conversation?.messages.length ?? 0);
+    },
+    0
   );
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-950">
-      <section className="bg-blue-600 px-6 py-12 text-white">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 md:flex-row md:items-start md:justify-between">
+    <main className="min-h-screen bg-slate-100 pb-24 text-slate-950 md:pb-0">
+      <section className="bg-blue-600 px-4 py-8 text-white sm:px-6 sm:py-12">
+        <div className="mx-auto flex max-w-6xl flex-col gap-5 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-wide text-blue-100">
+            <p className="text-xs font-bold uppercase tracking-wide text-blue-100 sm:text-sm">
               Cliente
             </p>
-            <h1 className="mt-3 text-4xl font-extrabold">Mis turnos</h1>
-            <p className="mt-3 max-w-2xl text-blue-100">
-              Revisá solicitudes, aceptaciones, cancelaciones, historial y
-              reseñas.
+
+            <h1 className="mt-3 text-3xl font-extrabold sm:text-4xl">
+              Mis turnos
+            </h1>
+
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-blue-100 sm:text-base">
+              Revisá solicitudes, turnos aceptados, mensajes, rechazos,
+              cancelaciones y reseñas pendientes.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
             <Link
               href="/professionals"
-              className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-blue-600 shadow-lg transition hover:bg-blue-50"
+              className="rounded-xl bg-white px-5 py-3 text-center text-sm font-bold text-blue-700"
             >
               Buscar profesionales
             </Link>
 
             <Link
               href="/client"
-              className="rounded-xl border border-blue-300 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+              className="rounded-xl border border-blue-300 px-5 py-3 text-center text-sm font-bold text-white"
             >
-              Volver
+              Dashboard
             </Link>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-10">
+      <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+        {(reviewableAppointments.length > 0 || unreadMessagesCount > 0) && (
+          <section className="mb-6 rounded-3xl border border-blue-300 bg-blue-50 p-5 shadow-xl shadow-blue-950/10 sm:mb-8 sm:p-8">
+            <p className="text-xs font-black uppercase tracking-wide text-blue-700 sm:text-sm">
+              Atención requerida
+            </p>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 sm:gap-4">
+              {reviewableAppointments.length > 0 ? (
+                <div className="rounded-2xl border border-blue-200 bg-white p-4 sm:p-5">
+                  <div className="flex items-center gap-3">
+                    <Star size={22} className="text-blue-600" />
+
+                    <div>
+                      <p className="text-lg font-extrabold text-slate-950">
+                        {reviewableAppointments.length} reseña(s) pendiente(s)
+                      </p>
+
+                      <p className="text-sm text-slate-600">
+                        Servicios completados sin valorar.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {unreadMessagesCount > 0 ? (
+                <Link
+                  href="/client/messages"
+                  className="rounded-2xl border border-blue-200 bg-white p-4 transition hover:border-blue-400 sm:p-5"
+                >
+                  <div className="flex items-center gap-3">
+                    <MessageCircle size={22} className="text-blue-600" />
+
+                    <div>
+                      <p className="text-lg font-extrabold text-slate-950">
+                        {unreadMessagesCount} mensaje(s)
+                      </p>
+
+                      <p className="text-sm text-slate-600">
+                        Nuevos sin leer.
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              ) : null}
+            </div>
+          </section>
+        )}
+
+        {params.success ? (
+          <div className="mb-5 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800 sm:mb-6 sm:p-5">
+            <CheckCircle2 size={20} />
+            <span>{params.success}</span>
+          </div>
+        ) : null}
+
         {params.error ? (
-          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-medium text-red-700">
+          <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700 sm:mb-6 sm:p-5">
             {params.error}
           </div>
         ) : null}
 
         {appointments.length === 0 ? (
-          <section className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+          <section className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm sm:p-10">
             <h2 className="text-2xl font-bold">Todavía no tenés turnos</h2>
+
             <p className="mx-auto mt-3 max-w-xl text-sm text-slate-500">
-              Buscá un profesional, elegí un servicio y solicitá tu primer
-              turno.
+              Cuando reserves un servicio, aparecerá en este panel.
             </p>
 
             <Link
               href="/professionals"
-              className="mt-6 inline-flex rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+              className="mt-6 inline-flex w-full justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white sm:w-auto"
             >
               Buscar profesionales
             </Link>
           </section>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             <AppointmentsSection
               title="Turnos activos"
-              description="Solicitudes pendientes o turnos aceptados."
-              count={activeAppointments.length}
+              description="Solicitudes enviadas y turnos aceptados."
               appointments={activeAppointments}
             />
 
             <AppointmentsSection
+              title="Reseñas pendientes"
+              description="Servicios completados que todavía podés valorar."
+              appointments={reviewableAppointments}
+            />
+
+            <AppointmentsSection
               title="Historial"
-              description="Turnos rechazados, cancelados, completados o expirados."
-              count={historicalAppointments.length}
+              description="Turnos completados, rechazados o cancelados."
               appointments={historicalAppointments}
             />
           </div>
         )}
       </section>
+
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 py-2 shadow-2xl backdrop-blur md:hidden">
+        <div className="grid grid-cols-4 gap-1">
+          <MobileNavItem href="/client" label="Inicio" icon={<CalendarDays size={20} />} />
+          <MobileNavItem href="/professionals" label="Buscar" icon={<Search size={20} />} />
+          <MobileNavItem href="/client/appointments" label="Turnos" icon={<CalendarDays size={20} />} />
+          <MobileNavItem href="/client/messages" label="Mensajes" icon={<MessageCircle size={20} />} />
+        </div>
+      </nav>
     </main>
   );
 }
@@ -162,49 +310,32 @@ export default async function ClientAppointmentsPage({
 function AppointmentsSection({
   title,
   description,
-  count,
   appointments,
 }: {
   title: string;
   description: string;
-  count: number;
-  appointments: {
-    id: string;
-    date: Date;
-    startTime: string;
-    endTime: string;
-    status: string;
-    service: {
-      title: string;
-      durationMinutes: number;
-    };
-    professional: {
-      user: {
-        name: string | null;
-        email: string;
-      };
-    };
-    reviews: {
-      id: string;
-    }[];
-  }[];
+  appointments: AppointmentCardData[];
 }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold">{title}</h2>
+          <h2 className="text-xl font-bold sm:text-2xl">{title}</h2>
           <p className="mt-1 text-sm text-slate-500">{description}</p>
         </div>
 
-        <p className="text-sm font-bold text-blue-600">{count} registro(s)</p>
+        <p className="text-sm font-bold text-blue-600">
+          {appointments.length} registro(s)
+        </p>
       </div>
 
       {appointments.length === 0 ? (
-        <p className="mt-5 text-sm text-slate-500">No hay registros.</p>
+        <p className="mt-5 text-sm text-slate-500">
+          No hay registros disponibles.
+        </p>
       ) : (
-        <div className="mt-6 grid gap-4">
-          {appointments.map((appointment) => (
+        <div className="mt-5 grid gap-4 sm:mt-6 sm:gap-5">
+          {appointments.map((appointment: AppointmentCardData) => (
             <AppointmentCard key={appointment.id} appointment={appointment} />
           ))}
         </div>
@@ -216,110 +347,136 @@ function AppointmentsSection({
 function AppointmentCard({
   appointment,
 }: {
-  appointment: {
-    id: string;
-    date: Date;
-    startTime: string;
-    endTime: string;
-    status: string;
-    service: {
-      title: string;
-      durationMinutes: number;
-    };
-    professional: {
-      user: {
-        name: string | null;
-        email: string;
-      };
-    };
-    reviews: {
-      id: string;
-    }[];
-  };
+  appointment: AppointmentCardData;
 }) {
+  const unreadMessages = appointment.conversation?.messages.length ?? 0;
   const canReview =
     appointment.status === "COMPLETED" && appointment.reviews.length === 0;
 
-  const alreadyReviewed =
-    appointment.status === "COMPLETED" && appointment.reviews.length > 0;
-
-  const canCancel = canCancelAppointment(appointment.date, appointment.status);
-
   return (
-    <article className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-      <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-        <div>
-          <Link
-            href={`/client/appointments/${appointment.id}`}
-            className="text-lg font-bold text-slate-950 hover:text-blue-600"
-          >
-            {appointment.service.title}
-          </Link>
+    <article
+      className={`rounded-3xl border p-5 shadow-sm sm:p-6 ${getCardClass(
+        appointment.status
+      )}`}
+    >
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <h3 className="text-lg font-extrabold text-slate-950 sm:text-xl">
+              {appointment.service.title}
+            </h3>
 
-          <p className="mt-2 text-sm text-slate-500">
-            Profesional:{" "}
-            {appointment.professional.user.name ??
-              appointment.professional.user.email}
-          </p>
+            <StatusBadge status={appointment.status} />
 
-          <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-600">
-            <span>{formatDateDDMMYYYY(appointment.date)}</span>
-            <span>
-              {appointment.startTime} - {appointment.endTime}
-            </span>
-            <span>{appointment.service.durationMinutes} min</span>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link
-              href={`/client/appointments/${appointment.id}`}
-              className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-all hover:bg-slate-100 active:scale-95"
-            >
-              Ver detalle
-            </Link>
-
-            {canCancel ? (
-              <form
-                action={async () => {
-                  "use server";
-                  await cancelAppointmentByClientAction(appointment.id);
-                }}
-              >
-                <button
-                  type="submit"
-                  className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-600 transition-all hover:bg-red-50 active:scale-95"
-                >
-                  Cancelar turno
-                </button>
-              </form>
+            {unreadMessages > 0 ? (
+              <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">
+                {unreadMessages} mensaje(s) nuevo(s)
+              </span>
             ) : null}
 
             {canReview ? (
-              <Link
-                href={`/client/appointments/${appointment.id}/review`}
-                className="inline-flex items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-amber-600 active:scale-95"
-              >
-                Puntuar profesional
-              </Link>
-            ) : null}
-
-            {alreadyReviewed ? (
-              <span className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700">
-                Reseña enviada
+              <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-black text-white">
+                Reseña pendiente
               </span>
             ) : null}
           </div>
 
-          {["REQUESTED", "ACCEPTED"].includes(appointment.status) &&
-          !canCancel ? (
-            <p className="mt-4 text-xs text-slate-500">
-              Cancelación bloqueada: faltan menos de 24 horas.
-            </p>
+          <p className="mt-3 text-sm text-slate-600">
+            Profesional:{" "}
+            <span className="font-bold text-slate-900">
+              {appointment.professional.user.name ??
+                appointment.professional.user.email}
+            </span>
+          </p>
+
+          <div className="mt-4 flex flex-wrap gap-2 text-xs sm:gap-3 sm:text-sm">
+            <span className="rounded-full bg-white px-3 py-2 font-bold text-slate-700">
+              {formatDateDDMMYYYY(appointment.date)}
+            </span>
+
+            <span className="rounded-full bg-white px-3 py-2 font-bold text-slate-700">
+              {appointment.startTime} - {appointment.endTime}
+            </span>
+
+            <span className="rounded-full bg-white px-3 py-2 font-bold text-slate-700">
+              {appointment.service.durationMinutes} min
+            </span>
+
+            <span className="rounded-full bg-blue-600 px-3 py-2 font-black text-white">
+              {appointment.resource?.name ?? "Agenda general"}
+            </span>
+          </div>
+
+          {appointment.statusReason ? (
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-sm font-bold text-slate-900">Motivo</p>
+              <p className="mt-1 text-sm text-slate-700">
+                {appointment.statusReason}
+              </p>
+            </div>
           ) : null}
         </div>
 
-        <StatusBadge status={appointment.status} />
+        <div className="flex w-full flex-col gap-3 xl:w-[300px]">
+          <Link
+            href={`/client/appointments/${appointment.id}`}
+            className="rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-blue-700"
+          >
+            Ver detalle
+          </Link>
+
+          <Link
+            href={`/professionals/${appointment.professional.id}`}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-black text-slate-700 transition hover:bg-slate-100"
+          >
+            Ver profesional
+          </Link>
+
+          {appointment.conversation ? (
+            <Link
+              href={`/client/messages/${appointment.conversation.id}`}
+              className={`rounded-xl px-4 py-3 text-center text-sm font-black transition ${
+                unreadMessages > 0
+                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              {unreadMessages > 0
+                ? "Ver mensajes nuevos"
+                : "Abrir conversación"}
+            </Link>
+          ) : null}
+
+          {canReview ? (
+            <Link
+              href={`/client/appointments/${appointment.id}/review`}
+              className="rounded-xl bg-amber-500 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-amber-600"
+            >
+              Dejar reseña
+            </Link>
+          ) : null}
+        </div>
       </div>
     </article>
+  );
+}
+
+function MobileNavItem({
+  href,
+  icon,
+  label,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-bold text-slate-600 active:bg-blue-50 active:text-blue-700"
+    >
+      {icon}
+      <span className="mt-1">{label}</span>
+    </Link>
   );
 }

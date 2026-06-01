@@ -24,6 +24,36 @@ function getMapEmbedUrl(location: string) {
   return `https://www.google.com/maps?q=${query}&output=embed`;
 }
 
+type PublicService = {
+  id: string;
+  title: string;
+  description: string | null;
+  durationMinutes: number;
+  price: { toString: () => string };
+  isActive: boolean;
+  modality: string;
+};
+
+type ProfessionalListItem = {
+  id: string;
+  businessName: string | null;
+  bio: string | null;
+  averageRating: number;
+  reviewCount: number;
+  profileImageUrl: string | null;
+  user: {
+    name: string | null;
+    email: string;
+  };
+  services: {
+    id: string;
+    title: string;
+    price: {
+      toString: () => string;
+    };
+  }[];
+};
+
 export default async function ProfessionalPublicPage({ params }: Props) {
   const { id } = await params;
 
@@ -174,7 +204,7 @@ export default async function ProfessionalPublicPage({ params }: Props) {
               </AppCard>
             ) : (
               <div className="space-y-5">
-                {professional.services.map((service) => (
+                {professional.services.map((service: PublicService) => (
                   <AppCard
                     key={service.id}
                     className="border-slate-100 hover:border-blue-200 hover:shadow-lg"
@@ -281,7 +311,19 @@ export default async function ProfessionalPublicPage({ params }: Props) {
               </AppCard>
             ) : (
               <div className="space-y-4">
-                {reviews.map((review) => (
+                {reviews.map((review: {
+                  id: string;
+                  rating: number;
+                  comment: string | null;
+                  professionalReply: string | null;
+                  createdAt: Date;
+                  client: {
+                    user: {
+                      name: string | null;
+                      email: string;
+                    };
+                  };
+                }) => (
                   <AppCard key={review.id} className="border-slate-100">
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -348,7 +390,7 @@ export default async function ProfessionalPublicPage({ params }: Props) {
               </p>
 
               <div className="mt-8 space-y-3">
-                {professional.services.slice(0, 3).map((service) => (
+                {professional.services.slice(0, 3).map((service: PublicService) => (
                   <AppButton
                     key={service.id}
                     href={`/professionals/${professional.id}/slots?serviceId=${service.id}`}

@@ -13,6 +13,30 @@ type ProfessionalsPageProps = {
   }>;
 };
 
+type ProfessionalListItem = {
+  id: string;
+  businessName: string | null;
+  specialty: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
+  location: string | null;
+  averageRating: number;
+  reviewCount: number;
+
+  user: {
+    name: string | null;
+    email: string;
+  };
+
+  services: {
+    id: string;
+    title: string;
+    price: {
+      toString: () => string;
+    };
+  }[];
+};
+
 export default async function ProfessionalsPage({
   searchParams,
 }: ProfessionalsPageProps) {
