@@ -4,18 +4,10 @@ import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/db/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-function getRedirectPath(role: string) {
-  if (role === "ADMIN") return "/admin";
-  if (role === "PROFESSIONAL") return "/professional";
-  return "/client";
-}
+import { getDashboardPathByRole } from "@/lib/auth/role-redirect";
 
 export async function loginAction(formData: FormData) {
-  const email = String(formData.get("email") ?? "")
-    .trim()
-    .toLowerCase();
-
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
@@ -53,5 +45,5 @@ export async function loginAction(formData: FormData) {
     redirect("/login?error=Tu%20cuenta%20est%C3%A1%20suspendida.");
   }
 
-  redirect(getRedirectPath(appUser.role));
+  redirect(getDashboardPathByRole(appUser.role));
 }
