@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
-import type { Role } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+type Role = "ADMIN" | "PROFESSIONAL" | "CLIENT";
 
 export async function getCurrentUser() {
   const supabase = await createSupabaseServerClient();
@@ -49,7 +50,7 @@ export async function requireUser() {
 export async function requireRole(allowedRoles: Role[]) {
   const user = await requireUser();
 
-  if (!allowedRoles.includes(user.role)) {
+  if (!allowedRoles.includes(user.role as Role)) {
     redirect("/");
   }
 
