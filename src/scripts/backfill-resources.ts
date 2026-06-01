@@ -1,4 +1,15 @@
-import { prisma } from "../src/lib/db/prisma";
+import { prisma } from "../lib/db/prisma";
+
+type ProfessionalService = {
+  id: string;
+};
+
+type ProfessionalAvailability = {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
+};
 
 async function run() {
   const professionals = await prisma.professionalProfile.findMany({
@@ -30,7 +41,7 @@ async function run() {
 
     if (professional.services.length > 0) {
       await prisma.resourceService.createMany({
-        data: professional.services.map((service) => ({
+        data: professional.services.map((service: ProfessionalService) => ({
           resourceId: resource.id,
           serviceId: service.id,
         })),
@@ -40,13 +51,15 @@ async function run() {
 
     if (professional.availability.length > 0) {
       await prisma.resourceAvailability.createMany({
-        data: professional.availability.map((availability) => ({
-          resourceId: resource.id,
-          dayOfWeek: availability.dayOfWeek,
-          startTime: availability.startTime,
-          endTime: availability.endTime,
-          isActive: availability.isActive,
-        })),
+        data: professional.availability.map(
+          (availability: ProfessionalAvailability) => ({
+            resourceId: resource.id,
+            dayOfWeek: availability.dayOfWeek,
+            startTime: availability.startTime,
+            endTime: availability.endTime,
+            isActive: availability.isActive,
+          })
+        ),
       });
     }
 
@@ -57,7 +70,7 @@ async function run() {
 }
 
 run()
-  .catch((error) => {
+  .catch((error: unknown) => {
     console.error(error);
     process.exit(1);
   })

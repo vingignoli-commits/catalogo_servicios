@@ -168,7 +168,7 @@ export default async function ProfessionalsPage({
         </AppCard>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {professionals.map((professional: ProfessionalListItem) => (
+          {professionals.map((professional) => (
             <Link key={professional.id} href={`/professionals/${professional.id}`}>
               <AppCard className="h-full overflow-hidden p-0 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-100">
                 <div className="relative h-44 overflow-hidden">

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import {
   ArrowRight,
@@ -23,10 +25,6 @@ const categories = [
   "Bienestar",
 ];
 
-function formatRating(value: number) {
-  return value.toFixed(1);
-}
-
 type FeaturedService = {
   id: string;
   title: string;
@@ -35,22 +33,12 @@ type FeaturedService = {
   };
 };
 
-type FeaturedProfessional = {
-  id: string;
-  businessName: string | null;
-  bio: string | null;
-  averageRating: number;
-  reviewCount: number;
-  user: {
-    name: string | null;
-    email: string;
-  };
-  services: FeaturedService[];
-};
+function formatRating(value: number) {
+  return value.toFixed(1);
+}
 
 export default async function HomePage() {
-  const featuredProfessionals: FeaturedProfessional[] =
-  await prisma.professionalProfile.findMany({
+  const featuredProfessionals = await prisma.professionalProfile.findMany({
     where: {
       isActive: true,
     },
@@ -90,9 +78,8 @@ export default async function HomePage() {
               <p className="text-base font-extrabold leading-none">
                 TurnoPro
               </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Reservas online
-              </p>
+
+              <p className="mt-1 text-xs text-slate-400">Reservas online</p>
             </div>
           </Link>
 
@@ -166,8 +153,14 @@ export default async function HomePage() {
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
               <TrustItem icon={<Clock3 size={18} />} text="Reserva 24/7" />
-              <TrustItem icon={<ShieldCheck size={18} />} text="Perfiles verificados" />
-              <TrustItem icon={<MessageCircle size={18} />} text="Mensajes directos" />
+              <TrustItem
+                icon={<ShieldCheck size={18} />}
+                text="Perfiles verificados"
+              />
+              <TrustItem
+                icon={<MessageCircle size={18} />}
+                text="Mensajes directos"
+              />
             </div>
           </section>
 
@@ -182,6 +175,7 @@ export default async function HomePage() {
                   <h2 className="text-xl font-extrabold">
                     ¿Qué necesitás reservar?
                   </h2>
+
                   <p className="mt-1 text-sm text-slate-500">
                     Elegí un profesional y un horario disponible.
                   </p>
@@ -204,7 +198,7 @@ export default async function HomePage() {
               </form>
 
               <div className="mt-6 grid grid-cols-2 gap-3">
-                {categories.slice(0, 4).map((category) => (
+                {categories.slice(0, 4).map((category: string) => (
                   <Link
                     key={category}
                     href={`/professionals?category=${encodeURIComponent(
@@ -228,6 +222,7 @@ export default async function HomePage() {
               <p className="text-sm font-black uppercase tracking-wide text-blue-600">
                 Categorías
               </p>
+
               <h2 className="mt-2 text-3xl font-black sm:text-4xl">
                 Servicios para reservar hoy
               </h2>
@@ -243,7 +238,7 @@ export default async function HomePage() {
           </div>
 
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {categories.map((category) => (
+            {categories.map((category: string) => (
               <Link
                 key={category}
                 href={`/professionals?category=${encodeURIComponent(category)}`}
@@ -254,6 +249,7 @@ export default async function HomePage() {
                 </div>
 
                 <h3 className="font-extrabold">{category}</h3>
+
                 <p className="mt-2 text-sm text-slate-500">
                   Ver disponibilidad
                 </p>
@@ -270,9 +266,11 @@ export default async function HomePage() {
               <p className="text-sm font-black uppercase tracking-wide text-blue-600">
                 Profesionales
               </p>
+
               <h2 className="mt-2 text-3xl font-black sm:text-4xl">
                 Perfiles destacados
               </h2>
+
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-base">
                 Elegí por reputación, servicios activos y disponibilidad.
               </p>
@@ -295,7 +293,7 @@ export default async function HomePage() {
             </div>
           ) : (
             <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {featuredProfessionals.map((professional: FeaturedProfessional) => (
+              {featuredProfessionals.map((professional) => (
                 <Link
                   key={professional.id}
                   href={`/professionals/${professional.id}`}
@@ -304,9 +302,7 @@ export default async function HomePage() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <h3 className="text-xl font-extrabold">
-                        {professional.businessName ??
-                          professional.user.name ??
-                          professional.user.email}
+                        {professional.user.name ?? professional.user.email}
                       </h3>
 
                       <p className="mt-2 line-clamp-2 text-sm text-slate-500">
@@ -363,11 +359,13 @@ export default async function HomePage() {
               title="Buscá"
               text="Encontrá profesionales por servicio, categoría o disponibilidad."
             />
+
             <StepCard
               number="2"
               title="Reservá"
               text="Elegí el horario que te conviene y solicitá el turno online."
             />
+
             <StepCard
               number="3"
               title="Gestioná"
@@ -413,9 +411,11 @@ export default async function HomePage() {
             <Link href="/professionals" className="hover:text-white">
               Buscar profesionales
             </Link>
+
             <Link href="/login" className="hover:text-white">
               Ingresar
             </Link>
+
             <Link href="/register" className="hover:text-white">
               Crear cuenta
             </Link>
