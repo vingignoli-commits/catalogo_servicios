@@ -13,6 +13,12 @@ const bulkAvailabilitySchema = z.object({
   endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
 });
 
+type ResourceAvailabilityBlock = {
+  id: string;
+  startTime: string;
+  endTime: string;
+};
+
 async function getCurrentProfessionalProfile() {
   const user = await requireRole(["PROFESSIONAL"]);
 
@@ -68,23 +74,29 @@ async function hasOverlap({
   endTime: string;
   excludeAvailabilityId?: string;
 }) {
-  const existingBlocks = await prisma.resourceAvailability.findMany({
-    where: {
-      resourceId,
-      dayOfWeek,
-      isActive: true,
-      id: excludeAvailabilityId
-        ? {
-            not: excludeAvailabilityId,
-          }
-        : undefined,
-    },
-  });
+  const existingBlocks: ResourceAvailabilityBlock[] =
+    await prisma.resourceAvailability.findMany({
+      where: {
+        resourceId,
+        dayOfWeek,
+        isActive: true,
+        id: excludeAvailabilityId
+          ? {
+              not: excludeAvailabilityId,
+            }
+          : undefined,
+      },
+      select: {
+        id: true,
+        startTime: true,
+        endTime: true,
+      },
+    });
 
   const newStart = timeToMinutes(startTime);
   const newEnd = timeToMinutes(endTime);
 
-  return existingBlocks.some((block) => {
+  return existingBlocks.some((block: ResourceAvailabilityBlock) => {
     const blockStart = timeToMinutes(block.startTime);
     const blockEnd = timeToMinutes(block.endTime);
 
@@ -134,7 +146,7 @@ export async function createResourceAvailabilityAction(
   }
 
   await prisma.resourceAvailability.createMany({
-    data: daysOfWeek.map((dayOfWeek) => ({
+    data: daysOfWeek.map((dayOfWeek: number) => ({
       resourceId: resource.id,
       dayOfWeek,
       startTime,
