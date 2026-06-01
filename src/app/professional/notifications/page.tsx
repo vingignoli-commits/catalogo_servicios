@@ -14,6 +14,16 @@ import {
   markProfessionalNotificationAsReadAction,
 } from "./actions";
 
+type ProfessionalNotificationItem = {
+  id: string;
+  type: string;
+  title: string;
+  content: string | null;
+  actionUrl: string | null;
+  readAt: Date | null;
+  createdAt: Date;
+};
+
 function formatDate(date: Date) {
   return date.toLocaleString("es-AR", {
     day: "2-digit",
@@ -40,18 +50,19 @@ function getNotificationTypeLabel(type: string) {
 export default async function ProfessionalNotificationsPage() {
   const user = await requireRole(["PROFESSIONAL"]);
 
-  const notifications = await prisma.notification.findMany({
-    where: {
-      userId: user.id,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 80,
-  });
+  const notifications: ProfessionalNotificationItem[] =
+    await prisma.notification.findMany({
+      where: {
+        userId: user.id,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 80,
+    });
 
   const unreadCount = notifications.filter(
-    (notification) => !notification.readAt
+    (notification: ProfessionalNotificationItem) => !notification.readAt
   ).length;
 
   return (
@@ -131,116 +142,120 @@ export default async function ProfessionalNotificationsPage() {
             </p>
           ) : (
             <div className="mt-6 grid gap-4 sm:mt-8">
-              {notifications.map((notification) => {
-                const isUnread = !notification.readAt;
+              {notifications.map(
+                (notification: ProfessionalNotificationItem) => {
+                  const isUnread = !notification.readAt;
 
-                return (
-                  <article
-                    key={notification.id}
-                    className={`rounded-3xl border p-5 transition sm:p-6 ${
-                      isUnread
-                        ? "border-blue-400 bg-blue-50 shadow-md"
-                        : "border-slate-200 bg-slate-50"
-                    }`}
-                  >
-                    <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-black ${
+                  return (
+                    <article
+                      key={notification.id}
+                      className={`rounded-3xl border p-5 transition sm:p-6 ${
+                        isUnread
+                          ? "border-blue-400 bg-blue-50 shadow-md"
+                          : "border-slate-200 bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-black ${
+                                isUnread
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-slate-200 text-slate-600"
+                              }`}
+                            >
+                              {isUnread ? "Nueva" : "Leída"}
+                            </span>
+
+                            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">
+                              {getNotificationTypeLabel(notification.type)}
+                            </span>
+                          </div>
+
+                          <h3
+                            className={`mt-4 text-base sm:text-lg ${
                               isUnread
-                                ? "bg-blue-600 text-white"
-                                : "bg-slate-200 text-slate-600"
+                                ? "font-extrabold text-blue-950"
+                                : "font-bold text-slate-950"
                             }`}
                           >
-                            {isUnread ? "Nueva" : "Leída"}
-                          </span>
+                            {notification.title}
+                          </h3>
 
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">
-                            {getNotificationTypeLabel(notification.type)}
-                          </span>
+                          {notification.content ? (
+                            <p
+                              className={`mt-2 text-sm ${
+                                isUnread
+                                  ? "font-semibold text-slate-800"
+                                  : "text-slate-600"
+                              }`}
+                            >
+                              {notification.content}
+                            </p>
+                          ) : null}
+
+                          <p className="mt-3 text-xs text-slate-400">
+                            {formatDate(notification.createdAt)}
+                          </p>
                         </div>
 
-                        <h3
-                          className={`mt-4 text-base sm:text-lg ${
-                            isUnread
-                              ? "font-extrabold text-blue-950"
-                              : "font-bold text-slate-950"
-                          }`}
-                        >
-                          {notification.title}
-                        </h3>
-
-                        {notification.content ? (
-                          <p
-                            className={`mt-2 text-sm ${
-                              isUnread
-                                ? "font-semibold text-slate-800"
-                                : "text-slate-600"
-                            }`}
-                          >
-                            {notification.content}
-                          </p>
-                        ) : null}
-
-                        <p className="mt-3 text-xs text-slate-400">
-                          {formatDate(notification.createdAt)}
-                        </p>
-                      </div>
-
-                      <div className="flex w-full shrink-0 flex-col gap-2 md:w-[180px]">
-                        {notification.actionUrl ? (
-                          <form
-                            action={markProfessionalNotificationAsReadAction}
-                          >
-                            <input
-                              type="hidden"
-                              name="notificationId"
-                              value={notification.id}
-                            />
-                            <input
-                              type="hidden"
-                              name="actionUrl"
-                              value={notification.actionUrl}
-                            />
-
-                            <button
-                              type="submit"
-                              className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 md:py-2"
+                        <div className="flex w-full shrink-0 flex-col gap-2 md:w-[180px]">
+                          {notification.actionUrl ? (
+                            <form
+                              action={markProfessionalNotificationAsReadAction}
                             >
-                              Abrir
-                            </button>
-                          </form>
-                        ) : null}
+                              <input
+                                type="hidden"
+                                name="notificationId"
+                                value={notification.id}
+                              />
 
-                        {isUnread ? (
-                          <form
-                            action={markProfessionalNotificationAsReadAction}
-                          >
-                            <input
-                              type="hidden"
-                              name="notificationId"
-                              value={notification.id}
-                            />
-                            <input
-                              type="hidden"
-                              name="actionUrl"
-                              value="/professional/notifications"
-                            />
+                              <input
+                                type="hidden"
+                                name="actionUrl"
+                                value={notification.actionUrl}
+                              />
 
-                            <button
-                              type="submit"
-                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 md:py-2"
+                              <button
+                                type="submit"
+                                className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 md:py-2"
+                              >
+                                Abrir
+                              </button>
+                            </form>
+                          ) : null}
+
+                          {isUnread ? (
+                            <form
+                              action={markProfessionalNotificationAsReadAction}
                             >
-                              Marcar leída
-                            </button>
-                          </form>
-                        ) : null}
+                              <input
+                                type="hidden"
+                                name="notificationId"
+                                value={notification.id}
+                              />
+
+                              <input
+                                type="hidden"
+                                name="actionUrl"
+                                value="/professional/notifications"
+                              />
+
+                              <button
+                                type="submit"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 md:py-2"
+                              >
+                                Marcar leída
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  </article>
-                );
-              })}
+                    </article>
+                  );
+                }
+              )}
             </div>
           )}
         </section>
@@ -248,11 +263,35 @@ export default async function ProfessionalNotificationsPage() {
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 py-2 shadow-2xl backdrop-blur md:hidden">
         <div className="grid grid-cols-5 gap-1">
-          <MobileNavItem href="/professional" label="Inicio" icon={<CalendarDays size={20} />} />
-          <MobileNavItem href="/professional/calendar/day" label="Día" icon={<CalendarClock size={20} />} />
-          <MobileNavItem href="/professional/appointments" label="Turnos" icon={<CalendarClock size={20} />} />
-          <MobileNavItem href="/professional/messages" label="Mensajes" icon={<MessageCircle size={20} />} />
-          <MobileNavItem href="/professional/notifications" label="Avisos" icon={<Bell size={20} />} />
+          <MobileNavItem
+            href="/professional"
+            label="Inicio"
+            icon={<CalendarDays size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/calendar/day"
+            label="Día"
+            icon={<CalendarClock size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/appointments"
+            label="Turnos"
+            icon={<CalendarClock size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/messages"
+            label="Mensajes"
+            icon={<MessageCircle size={20} />}
+          />
+
+          <MobileNavItem
+            href="/professional/notifications"
+            label="Avisos"
+            icon={<Bell size={20} />}
+          />
         </div>
       </nav>
     </main>
@@ -274,6 +313,7 @@ function MobileNavItem({
       className="flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-bold text-slate-600 active:bg-blue-50 active:text-blue-700"
     >
       {icon}
+
       <span className="mt-1">{label}</span>
     </Link>
   );
