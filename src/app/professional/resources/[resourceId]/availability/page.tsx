@@ -45,6 +45,14 @@ type ResourceAvailabilityPageProps = {
   }>;
 };
 
+type ResourceAvailabilityItem = {
+  id: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
+};
+
 export default async function ResourceAvailabilityPage({
   params,
   searchParams,
@@ -170,7 +178,7 @@ export default async function ResourceAvailabilityPage({
                   <p className="mt-1 text-slate-500">
                     {
                       resource.availability.filter(
-                        (availability) => availability.isActive
+                        (availability: ResourceAvailabilityItem) => availability.isActive
                       ).length
                     }{" "}
                     bloque(s)
@@ -305,7 +313,7 @@ export default async function ResourceAvailabilityPage({
                     </thead>
 
                     <tbody className="bg-white">
-                      {resource.availability.map((availability) => (
+                      {resource.availability.map((availability: ResourceAvailabilityItem) => (
                         <tr
                           key={availability.id}
                           className="border-t border-slate-200"
