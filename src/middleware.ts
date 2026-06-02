@@ -4,12 +4,16 @@ import { createServerClient } from "@supabase/ssr";
 const protectedRoutes = ["/admin", "/professional", "/client"];
 const authRoutes = ["/login", "/register"];
 
+function matchesRoute(pathname: string, route: string) {
+  return pathname === route || pathname.startsWith(`${route}/`);
+}
+
 function isProtectedRoute(pathname: string) {
-  return protectedRoutes.some((route) => pathname.startsWith(route));
+  return protectedRoutes.some((route) => matchesRoute(pathname, route));
 }
 
 function isAuthRoute(pathname: string) {
-  return authRoutes.some((route) => pathname.startsWith(route));
+  return authRoutes.some((route) => matchesRoute(pathname, route));
 }
 
 export async function middleware(request: NextRequest) {
