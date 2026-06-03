@@ -13,8 +13,13 @@ export async function forgotPasswordAction(formData: FormData) {
 
   const supabase = await createSupabaseServerClient();
 
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const origin = process.env.NEXT_PUBLIC_SITE_URL;
+  
+  if (!origin) {
+    redirect(
+      "/forgot-password?error=Falta%20configurar%20NEXT_PUBLIC_SITE_URL."
+    );
+  }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/reset-password`,
