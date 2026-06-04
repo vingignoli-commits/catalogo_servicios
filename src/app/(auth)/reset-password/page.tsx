@@ -1,29 +1,15 @@
 import Link from "next/link";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { resetPasswordAction } from "./actions";
 
 export default async function ResetPasswordPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    code?: string;
     error?: string;
   }>;
 }) {
   const params = await searchParams;
-
-  let exchangeError: string | null = null;
-
-  if (params.code) {
-    const supabase = await createSupabaseServerClient();
-
-    const { error } = await supabase.auth.exchangeCodeForSession(params.code);
-
-    if (error) {
-      exchangeError = "El enlace expiró o no es válido. Pedí uno nuevo.";
-    }
-  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 py-10 text-white">
@@ -41,12 +27,6 @@ export default async function ResetPasswordPage({
         {params.error ? (
           <div className="mt-6 rounded-2xl border border-red-900 bg-red-950/60 p-4 text-sm font-bold text-red-200">
             {params.error}
-          </div>
-        ) : null}
-
-        {exchangeError ? (
-          <div className="mt-6 rounded-2xl border border-red-900 bg-red-950/60 p-4 text-sm font-bold text-red-200">
-            {exchangeError}
           </div>
         ) : null}
 
