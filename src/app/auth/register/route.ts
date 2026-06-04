@@ -5,6 +5,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getDashboardPathByRole } from "@/lib/auth/role-redirect";
+import {
+  APP_SESSION_COOKIE,
+  createAppSessionToken,
+} from "@/lib/auth/app-session";
 
 type CookieToSet = {
   name: string;
@@ -22,13 +26,24 @@ const registerSchema = z.object({
 function redirectWithCookies(
   request: NextRequest,
   path: string,
-  cookiesToSet: CookieToSet[]
+  cookiesToSet: CookieToSet[],
+  appUserId?: string
 ) {
   const response = NextResponse.redirect(new URL(path, request.url));
 
   cookiesToSet.forEach(({ name, value, options }) => {
     response.cookies.set(name, value, options);
   });
+
+  if (appUserId) {
+    response.cookies.set(APP_SESSION_COOKIE, createAppSessionToken(appUserId), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+  }
 
   return response;
 }
@@ -140,17 +155,18 @@ export async function POST(request: NextRequest) {
   });
 
   if (loginError) {
-    return NextResponse.redirect(
-      new URL(
-        "/login?error=Usuario%20creado.%20Inici%C3%A1%20sesi%C3%B3n%20manualmente.",
-        request.url
-      )
+    return redirectWithCookies(
+      request,
+      "/login?error=Usuario%20creado.%20Inici%C3%A1%20sesi%C3%B3n%20manualmente.",
+      cookiesToSet,
+      appUser.id
     );
   }
 
   return redirectWithCookies(
     request,
     getDashboardPathByRole(appUser.role),
-    cookiesToSet
+    cookiesToSet,
+    appUser.id
   );
 }
