@@ -6,8 +6,6 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import { loginAction } from "./actions";
-
 export default async function LoginPage({
   searchParams,
 }: {
@@ -66,9 +64,7 @@ export default async function LoginPage({
 
                 <div>
                   <p className="font-black">TurnoPro</p>
-                  <p className="text-xs text-slate-400">
-                    Reservas online
-                  </p>
+                  <p className="text-xs text-slate-400">Reservas online</p>
                 </div>
               </Link>
 
@@ -101,7 +97,7 @@ export default async function LoginPage({
                 </div>
               ) : null}
 
-              <form action={loginAction} className="mt-8 space-y-5">
+              <form action="/auth/login" method="POST" className="mt-8 space-y-5">
                 <div>
                   <label className="text-sm font-bold text-slate-800">
                     Email
@@ -126,10 +122,7 @@ export default async function LoginPage({
                   </label>
 
                   <div className="mt-2 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 ring-blue-500 focus-within:ring-2">
-                    <LockKeyhole
-                      size={18}
-                      className="text-slate-400"
-                    />
+                    <LockKeyhole size={18} className="text-slate-400" />
 
                     <input
                       type="password"
@@ -141,16 +134,6 @@ export default async function LoginPage({
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <Link
-                    href="/forgot-password"
-                    className="text-sm font-black text-blue-600"
-                  >
-                    Olvidé mi contraseña
-                  </Link>
-                </div>
-
-                
                 <button
                   type="submit"
                   className="w-full rounded-2xl bg-blue-600 px-5 py-4 text-sm font-black text-white transition hover:bg-blue-700"
@@ -167,18 +150,14 @@ export default async function LoginPage({
                   />
 
                   <p className="text-sm leading-relaxed text-slate-600">
-                    Tu cuenta define si entrás como cliente,
-                    profesional o admin. admin@test.com admintest
+                    Tu cuenta define si entrás como cliente, profesional o admin.
                   </p>
                 </div>
               </div>
 
               <div className="mt-6 text-center text-sm text-slate-500">
                 ¿No tenés cuenta?{" "}
-                <Link
-                  href="/register"
-                  className="font-black text-blue-600"
-                >
+                <Link href="/register" className="font-black text-blue-600">
                   Crear cuenta
                 </Link>
               </div>
@@ -193,10 +172,7 @@ export default async function LoginPage({
 function TrustItem({ text }: { text: string }) {
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white">
-      <ShieldCheck
-        size={18}
-        className="text-blue-100"
-      />
+      <ShieldCheck size={18} className="text-blue-100" />
       {text}
     </div>
   );
