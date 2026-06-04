@@ -2,7 +2,6 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 const protectedRoutes = ["/admin", "/professional", "/client"];
-const authRoutes = ["/login", "/register"];
 
 function matchesRoute(pathname: string, route: string) {
   return pathname === route || pathname.startsWith(`${route}/`);
@@ -10,10 +9,6 @@ function matchesRoute(pathname: string, route: string) {
 
 function isProtectedRoute(pathname: string) {
   return protectedRoutes.some((route) => matchesRoute(pathname, route));
-}
-
-function isAuthRoute(pathname: string) {
-  return authRoutes.some((route) => matchesRoute(pathname, route));
 }
 
 export async function middleware(request: NextRequest) {
@@ -60,12 +55,6 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  if (isAuthRoute(pathname) && user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 
