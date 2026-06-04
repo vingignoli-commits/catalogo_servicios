@@ -3,6 +3,10 @@ import { createServerClient } from "@supabase/ssr";
 
 import { prisma } from "@/lib/db/prisma";
 import { getDashboardPathByRole } from "@/lib/auth/role-redirect";
+import {
+  APP_SESSION_COOKIE,
+  createAppSessionToken,
+} from "@/lib/auth/app-session";
 
 type CookieToSet = {
   name: string;
@@ -13,13 +17,24 @@ type CookieToSet = {
 function redirectWithCookies(
   request: NextRequest,
   path: string,
-  cookiesToSet: CookieToSet[]
+  cookiesToSet: CookieToSet[],
+  appUserId?: string
 ) {
   const response = NextResponse.redirect(new URL(path, request.url));
 
   cookiesToSet.forEach(({ name, value, options }) => {
     response.cookies.set(name, value, options);
   });
+
+  if (appUserId) {
+    response.cookies.set(APP_SESSION_COOKIE, createAppSessionToken(appUserId), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+  }
 
   return response;
 }
@@ -83,6 +98,7 @@ export async function POST(request: NextRequest) {
       email: data.user.email.toLowerCase(),
     },
     select: {
+      id: true,
       role: true,
       status: true,
     },
@@ -111,6 +127,7 @@ export async function POST(request: NextRequest) {
   return redirectWithCookies(
     request,
     getDashboardPathByRole(appUser.role),
-    cookiesToSet
+    cookiesToSet,
+    appUser.id
   );
 }
