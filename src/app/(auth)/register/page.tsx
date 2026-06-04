@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-import { registerAction } from "./actions";
-
 type RegisterPageProps = {
   searchParams: Promise<{
     error?: string;
@@ -30,11 +28,12 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
           </div>
         ) : null}
 
-        <form action={registerAction} className="mt-8 space-y-5">
+        <form action="/auth/register" method="POST" className="mt-8 space-y-5">
           <div>
             <label className="text-sm font-medium text-slate-200" htmlFor="name">
               Nombre
             </label>
+
             <input
               id="name"
               name="name"
@@ -53,6 +52,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
             >
               Email
             </label>
+
             <input
               id="email"
               name="email"
@@ -70,6 +70,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
             >
               Contraseña
             </label>
+
             <input
               id="password"
               name="password"
@@ -85,6 +86,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
             <label className="text-sm font-medium text-slate-200" htmlFor="role">
               Tipo de cuenta
             </label>
+
             <select
               id="role"
               name="role"
