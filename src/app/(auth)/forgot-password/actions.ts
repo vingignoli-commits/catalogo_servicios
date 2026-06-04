@@ -11,27 +11,25 @@ export async function forgotPasswordAction(formData: FormData) {
     redirect("/forgot-password?error=Ingres%C3%A1%20tu%20email.");
   }
 
-  const supabase = await createSupabaseServerClient();
-
   const origin = process.env.NEXT_PUBLIC_SITE_URL;
-  
+
   if (!origin) {
     redirect(
       "/forgot-password?error=Falta%20configurar%20NEXT_PUBLIC_SITE_URL."
     );
   }
 
+  const supabase = await createSupabaseServerClient();
+
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/reset-password`,
+    redirectTo: `${origin}/auth/callback?next=/reset-password`,
   });
 
   if (error) {
-    redirect(
-      `/forgot-password?error=${encodeURIComponent(error.message)}`
-    );
+    redirect(`/forgot-password?error=${encodeURIComponent(error.message)}`);
   }
 
   redirect(
-    "/forgot-password?success=Te%20enviamos%20un%20email%20para%20recuperar%20tu%20contrase%C3%B1a."
+    "/forgot-password?success=Si%20el%20email%20existe%2C%20vas%20a%20recibir%20un%20enlace%20para%20recuperar%20tu%20contrase%C3%B1a."
   );
 }
