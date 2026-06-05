@@ -14,12 +14,17 @@ type CookieToSet = {
   options: Parameters<NextResponse["cookies"]["set"]>[2];
 };
 
-function redirectWithCookies(
-  request: NextRequest,
-  path: string,
-  cookiesToSet: CookieToSet[],
-  appUserId?: string
-) {
+function redirectWithCookies({
+  request,
+  path,
+  cookiesToSet,
+  appUserId,
+}: {
+  request: NextRequest;
+  path: string;
+  cookiesToSet: CookieToSet[];
+  appUserId?: string;
+}) {
   const response = NextResponse.redirect(new URL(path, request.url));
 
   cookiesToSet.forEach(({ name, value, options }) => {
@@ -30,7 +35,7 @@ function redirectWithCookies(
     response.cookies.set(APP_SESSION_COOKIE, createAppSessionToken(appUserId), {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
     });
@@ -76,7 +81,11 @@ export async function POST(request: NextRequest) {
 
       setAll(items) {
         items.forEach(({ name, value, options }) => {
-          cookiesToSet.push({ name, value, options });
+          cookiesToSet.push({
+            name,
+            value,
+            options,
+          });
         });
       },
     },
@@ -107,27 +116,27 @@ export async function POST(request: NextRequest) {
   if (!appUser) {
     await supabase.auth.signOut();
 
-    return redirectWithCookies(
+    return redirectWithCookies({
       request,
-      "/login?error=Usuario%20sin%20perfil%20interno.",
-      cookiesToSet
-    );
+      path: "/login?error=Usuario%20sin%20perfil%20interno.",
+      cookiesToSet,
+    });
   }
 
   if (appUser.status === "SUSPENDED") {
     await supabase.auth.signOut();
 
-    return redirectWithCookies(
+    return redirectWithCookies({
       request,
-      "/login?error=Tu%20cuenta%20est%C3%A1%20suspendida.",
-      cookiesToSet
-    );
+      path: "/login?error=Tu%20cuenta%20est%C3%A1%20suspendida.",
+      cookiesToSet,
+    });
   }
 
-  return redirectWithCookies(
+  return redirectWithCookies({
     request,
-    getDashboardPathByRole(appUser.role),
+    path: getDashboardPathByRole(appUser.role),
     cookiesToSet,
-    appUser.id
-  );
+    appUserId: appUser.id,
+  });
 }
