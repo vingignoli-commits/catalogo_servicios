@@ -10,32 +10,42 @@ import {
 
 type Role = "ADMIN" | "PROFESSIONAL" | "CLIENT";
 
+async function getUserFromAppSession() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(APP_SESSION_COOKIE)?.value;
+  const userId = readUserIdFromAppSessionToken(token);
+
+  if (!userId) {
+    return null;
+  }
+
+  return prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+  });
+}
+
 export async function getCurrentUser() {
+  const appSessionUser = await getUserFromAppSession();
+
+  if (appSessionUser) {
+    return appSessionUser;
+  }
+
   const supabase = await createSupabaseServerClient();
 
   const {
     data: { user: authUser },
   } = await supabase.auth.getUser();
 
-  if (authUser?.email) {
-    const appUser = await prisma.user.findUnique({
-      where: {
-        email: authUser.email.toLowerCase(),
-      },
-    });
-
-    if (appUser) return appUser;
+  if (!authUser?.email) {
+    return null;
   }
-
-  const cookieStore = await cookies();
-  const token = cookieStore.get(APP_SESSION_COOKIE)?.value;
-  const userId = readUserIdFromAppSessionToken(token);
-
-  if (!userId) return null;
 
   return prisma.user.findUnique({
     where: {
-      id: userId,
+      email: authUser.email.toLowerCase(),
     },
   });
 }
