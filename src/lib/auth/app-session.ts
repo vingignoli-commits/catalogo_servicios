@@ -24,7 +24,6 @@ export function readUserIdFromAppSessionToken(token?: string) {
   if (!token) return null;
 
   const [userId, signature] = token.split(".");
-
   if (!userId || !signature) return null;
 
   const expectedSignature = crypto
@@ -37,7 +36,5 @@ export function readUserIdFromAppSessionToken(token?: string) {
 
   if (provided.length !== expected.length) return null;
 
-  const isValid = crypto.timingSafeEqual(provided, expected);
-
-  return isValid ? userId : null;
+  return crypto.timingSafeEqual(provided, expected) ? userId : null;
 }
