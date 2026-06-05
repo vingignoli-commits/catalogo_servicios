@@ -9,7 +9,6 @@ export async function GET(request: NextRequest) {
   await supabase.auth.signOut();
 
   const response = NextResponse.redirect(new URL("/login", request.url));
-
   response.cookies.delete(APP_SESSION_COOKIE);
 
   return response;
