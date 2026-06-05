@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 const protectedRoutes = ["/admin", "/professional", "/client"];
+const APP_SESSION_COOKIE = "turnopro_user_session";
 
 function matchesRoute(pathname: string, route: string) {
   return pathname === route || pathname.startsWith(`${route}/`);
@@ -16,11 +17,26 @@ export async function middleware(request: NextRequest) {
     request,
   });
 
+  const pathname = request.nextUrl.pathname;
+
+  if (!isProtectedRoute(pathname)) {
+    return response;
+  }
+
+  const appSession = request.cookies.get(APP_SESSION_COOKIE)?.value;
+
+  if (appSession) {
+    return response;
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return response;
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("next", pathname);
+    return NextResponse.redirect(url);
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -45,13 +61,11 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  const pathname = request.nextUrl.pathname;
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (isProtectedRoute(pathname) && !user) {
+  if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
