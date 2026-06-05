@@ -28,20 +28,16 @@ export async function getCurrentUser() {
   }
 
   const cookieStore = await cookies();
-  const appSession = cookieStore.get(APP_SESSION_COOKIE)?.value;
-  const userId = readUserIdFromAppSessionToken(appSession);
+  const token = cookieStore.get(APP_SESSION_COOKIE)?.value;
+  const userId = readUserIdFromAppSessionToken(token);
 
-  if (!userId) {
-    return null;
-  }
+  if (!userId) return null;
 
-  const appUser = await prisma.user.findUnique({
+  return prisma.user.findUnique({
     where: {
       id: userId,
     },
   });
-
-  return appUser;
 }
 
 export async function requireUser() {
