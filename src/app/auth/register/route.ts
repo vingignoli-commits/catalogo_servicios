@@ -23,12 +23,17 @@ const registerSchema = z.object({
   role: z.enum(["PROFESSIONAL", "CLIENT"]),
 });
 
-function redirectWithCookies(
-  request: NextRequest,
-  path: string,
-  cookiesToSet: CookieToSet[],
-  appUserId?: string
-) {
+function redirectWithCookies({
+  request,
+  path,
+  cookiesToSet,
+  appUserId,
+}: {
+  request: NextRequest;
+  path: string;
+  cookiesToSet: CookieToSet[];
+  appUserId?: string;
+}) {
   const response = NextResponse.redirect(new URL(path, request.url));
 
   cookiesToSet.forEach(({ name, value, options }) => {
@@ -39,7 +44,7 @@ function redirectWithCookies(
     response.cookies.set(APP_SESSION_COOKIE, createAppSessionToken(appUserId), {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
     });
@@ -125,12 +130,12 @@ export async function POST(request: NextRequest) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.redirect(
-      new URL(
-        "/login?error=Usuario%20creado.%20Inici%C3%A1%20sesi%C3%B3n%20manualmente.",
-        request.url
-      )
-    );
+    return redirectWithCookies({
+      request,
+      path: getDashboardPathByRole(appUser.role),
+      cookiesToSet: [],
+      appUserId: appUser.id,
+    });
   }
 
   const cookiesToSet: CookieToSet[] = [];
@@ -143,30 +148,25 @@ export async function POST(request: NextRequest) {
 
       setAll(items) {
         items.forEach(({ name, value, options }) => {
-          cookiesToSet.push({ name, value, options });
+          cookiesToSet.push({
+            name,
+            value,
+            options,
+          });
         });
       },
     },
   });
 
-  const { error: loginError } = await supabase.auth.signInWithPassword({
+  await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
-  if (loginError) {
-    return redirectWithCookies(
-      request,
-      "/login?error=Usuario%20creado.%20Inici%C3%A1%20sesi%C3%B3n%20manualmente.",
-      cookiesToSet,
-      appUser.id
-    );
-  }
-
-  return redirectWithCookies(
+  return redirectWithCookies({
     request,
-    getDashboardPathByRole(appUser.role),
+    path: getDashboardPathByRole(appUser.role),
     cookiesToSet,
-    appUser.id
-  );
+    appUserId: appUser.id,
+  });
 }
