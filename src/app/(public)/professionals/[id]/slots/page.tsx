@@ -14,7 +14,6 @@ import {
   getAvailableResourceSlots,
   getAvailableSlots,
 } from "@/lib/availability/slots";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { AppButton } from "@/components/ui/app-button";
 import { AppCard } from "@/components/ui/app-card";
 import { PageShell } from "@/components/ui/page-shell";
@@ -83,8 +82,6 @@ export default async function SlotsPage({ params, searchParams }: Props) {
     return notFound();
   }
 
-  const user = await getCurrentUser();
-
   const professional = await prisma.professionalProfile.findUnique({
     where: {
       id,
@@ -136,7 +133,6 @@ export default async function SlotsPage({ params, searchParams }: Props) {
   });
 
   const useResourceSlots = resourceSlots.length > 0;
-  const isClient = user?.role === "CLIENT";
 
   return (
     <PageShell
@@ -190,15 +186,19 @@ export default async function SlotsPage({ params, searchParams }: Props) {
 
               <div className="rounded-3xl bg-white p-6 text-center shadow-sm">
                 <p className="text-sm text-slate-500">Profesional</p>
+
                 <p className="mt-2 text-lg font-bold text-slate-950">
-                  {professional.user.name ?? professional.user.email.split("@")[0]}
+                  {professional.user.name ??
+                    professional.user.email.split("@")[0]}
                 </p>
 
                 <div className="mt-4 flex items-center justify-center gap-2 text-blue-600">
                   <Star size={16} fill="currentColor" />
+
                   <span className="font-bold">
                     {professional.averageRating.toFixed(1)}
                   </span>
+
                   <span className="text-sm text-slate-400">
                     ({professional.reviewCount})
                   </span>
@@ -266,22 +266,6 @@ export default async function SlotsPage({ params, searchParams }: Props) {
               </p>
             </div>
 
-            {!isClient ? (
-              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
-                Para solicitar un turno tenés que iniciar sesión como cliente.
-
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <AppButton href="/login" size="sm">
-                    Iniciar sesión
-                  </AppButton>
-
-                  <AppButton href="/register" variant="secondary" size="sm">
-                    Crear cuenta cliente
-                  </AppButton>
-                </div>
-              </div>
-            ) : null}
-
             {useResourceSlots ? (
               resourceSlots.length === 0 ? (
                 <EmptySlots />
@@ -289,22 +273,6 @@ export default async function SlotsPage({ params, searchParams }: Props) {
                 <div className="mt-6 grid gap-3">
                   {resourceSlots.map((slot) => {
                     const key = `${slot.resourceId}-${slot.startTime}-${slot.endTime}`;
-
-                    if (!isClient) {
-                      return (
-                        <div
-                          key={key}
-                          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500"
-                        >
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="font-bold text-slate-900">
-                              {slot.startTime}
-                            </span>
-                            <span>{slot.resourceName}</span>
-                          </div>
-                        </div>
-                      );
-                    }
 
                     return (
                       <Link
@@ -343,34 +311,21 @@ export default async function SlotsPage({ params, searchParams }: Props) {
               <EmptySlots />
             ) : (
               <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {legacySlots.map((slot) => {
-                  if (!isClient) {
-                    return (
-                      <div
-                        key={`${slot.startTime}-${slot.endTime}`}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-center text-sm font-bold text-slate-400"
-                      >
-                        {slot.startTime}
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <Link
-                      key={`${slot.startTime}-${slot.endTime}`}
-                      href={buildConfirmUrl({
-                        professionalId: professional.id,
-                        serviceId: service.id,
-                        date: dateInputValue,
-                        startTime: slot.startTime,
-                        endTime: slot.endTime,
-                      })}
-                      className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 text-center text-sm font-bold text-blue-700 transition-all hover:border-blue-600 hover:bg-blue-600 hover:text-white active:scale-95"
-                    >
-                      {slot.startTime}
-                    </Link>
-                  );
-                })}
+                {legacySlots.map((slot) => (
+                  <Link
+                    key={`${slot.startTime}-${slot.endTime}`}
+                    href={buildConfirmUrl({
+                      professionalId: professional.id,
+                      serviceId: service.id,
+                      date: dateInputValue,
+                      startTime: slot.startTime,
+                      endTime: slot.endTime,
+                    })}
+                    className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 text-center text-sm font-bold text-blue-700 transition-all hover:border-blue-600 hover:bg-blue-600 hover:text-white active:scale-95"
+                  >
+                    {slot.startTime}
+                  </Link>
+                ))}
               </div>
             )}
           </AppCard>
@@ -401,6 +356,7 @@ export default async function SlotsPage({ params, searchParams }: Props) {
 
               <div className="mt-5 flex items-center justify-center gap-2 text-blue-600">
                 <Star size={16} fill="currentColor" />
+
                 <span className="font-bold">
                   {professional.averageRating.toFixed(1)}
                 </span>
@@ -436,9 +392,11 @@ function EmptySlots() {
   return (
     <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center">
       <CalendarDays size={40} className="mx-auto text-slate-300" />
+
       <h3 className="mt-4 text-lg font-bold text-slate-950">
         No hay turnos disponibles
       </h3>
+
       <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
         Probá con otra fecha. Puede que no haya recursos disponibles, horarios
         cargados o que el profesional tenga excepciones.
