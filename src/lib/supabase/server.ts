@@ -18,7 +18,7 @@ export async function createSupabaseServerClient() {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // Server Components no pueden setear cookies — el middleware lo hace
+            // En Server Components no se pueden setear cookies — el middleware lo hace
           }
         },
       },
