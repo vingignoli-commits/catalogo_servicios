@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(request: NextRequest) {
@@ -25,17 +25,16 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // getUser() refresca el token si hace falta y escribe las cookies nuevas.
-  // Esto es lo único que tiene que hacer el middleware en cada request.
+  // Refresca el token en cada request (el unico lugar donde puede hacerlo)
   const { data: { user } } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isProtectedRoute =
+  const isProtected =
     path.startsWith("/admin") ||
     path.startsWith("/client") ||
     path.startsWith("/professional");
 
-  if (!user && isProtectedRoute) {
+  if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", path);
@@ -47,16 +46,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Correr en TODAS las rutas excepto:
-     * - _next/static  (archivos estáticos de Next.js)
-     * - _next/image   (optimización de imágenes)
-     * - favicon.ico
-     * - archivos con extensión (*.png, *.jpg, *.svg, etc.)
-     *
-     * Esto garantiza que el token de Supabase se refresque en cada
-     * navegación, incluyendo /professionals/* y cualquier ruta pública.
-     */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

@@ -12,14 +12,13 @@ export async function createSupabaseServerClient() {
         getAll() {
           return cookieStore.getAll();
         },
-
         setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
           } catch {
-            // Evita romper Server Components cuando Supabase intenta refrescar cookies.
+            // Server Components no pueden setear cookies — el middleware lo hace
           }
         },
       },

@@ -1,118 +1,78 @@
 import Link from "next/link";
 
-type RegisterPageProps = {
-  searchParams: Promise<{
-    error?: string;
-  }>;
-};
+type Props = { searchParams: Promise<{ error?: string }> };
 
-export default async function RegisterPage({ searchParams }: RegisterPageProps) {
+export default async function RegisterPage({ searchParams }: Props) {
   const params = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 py-10 text-white">
-      <section className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-xl">
-        <p className="text-sm font-medium uppercase tracking-wide text-emerald-400">
-          Crear cuenta
-        </p>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold text-slate-900">TurnoPro</h1>
+          <p className="text-slate-500 mt-1 text-sm">Creá tu cuenta</p>
+        </div>
 
-        <h1 className="mt-3 text-3xl font-bold">Registrarse</h1>
-
-        <p className="mt-2 text-sm text-slate-300">
-          Creá una cuenta como cliente o profesional.
-        </p>
-
-        {params.error ? (
-          <div className="mt-6 rounded-xl border border-red-900 bg-red-950/60 p-4 text-sm text-red-200">
-            {params.error}
+        {params.error && (
+          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+            {decodeURIComponent(params.error)}
           </div>
-        ) : null}
+        )}
 
-        <form action="/auth/register" method="POST" className="mt-8 space-y-5">
+        <form action="/auth/register" method="POST" className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
           <div>
-            <label className="text-sm font-medium text-slate-200" htmlFor="name">
-              Nombre
-            </label>
-
+            <label className="block text-sm font-medium text-slate-700 mb-1">Nombre completo</label>
             <input
-              id="name"
-              name="name"
-              type="text"
-              required
-              minLength={2}
-              className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm outline-none ring-emerald-500 transition focus:ring-2"
-              placeholder="Ej: Juan Pérez"
+              name="name" type="text" required
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Juan García"
             />
           </div>
 
           <div>
-            <label
-              className="text-sm font-medium text-slate-200"
-              htmlFor="email"
-            >
-              Email
-            </label>
-
+            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
             <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm outline-none ring-emerald-500 transition focus:ring-2"
+              name="email" type="email" required
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="tu@email.com"
             />
           </div>
 
           <div>
-            <label
-              className="text-sm font-medium text-slate-200"
-              htmlFor="password"
-            >
-              Contraseña
-            </label>
-
+            <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
             <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              minLength={8}
-              className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm outline-none ring-emerald-500 transition focus:ring-2"
+              name="password" type="password" required minLength={8}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Mínimo 8 caracteres"
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-200" htmlFor="role">
-              Tipo de cuenta
-            </label>
-
+            <label className="block text-sm font-medium text-slate-700 mb-1">Quiero registrarme como</label>
             <select
-              id="role"
               name="role"
-              defaultValue="CLIENT"
-              className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm outline-none ring-emerald-500 transition focus:ring-2"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
             >
-              <option value="CLIENT">Cliente</option>
-              <option value="PROFESSIONAL">Profesional</option>
+              <option value="CLIENT">Cliente — buscar y reservar servicios</option>
+              <option value="PROFESSIONAL">Profesional — ofrecer mis servicios</option>
             </select>
           </div>
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors"
           >
             Crear cuenta
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-slate-400">
+        <p className="text-center text-sm text-slate-500 mt-4">
           ¿Ya tenés cuenta?{" "}
-          <Link href="/login" className="font-medium text-emerald-400">
-            Iniciar sesión
+          <Link href="/login" className="text-blue-600 hover:underline font-medium">
+            Iniciá sesión
           </Link>
         </p>
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }

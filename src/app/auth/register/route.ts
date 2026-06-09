@@ -1,89 +1,72 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { z } from "zod";
-
 import { prisma } from "@/lib/db/prisma";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getDashboardPathByRole } from "@/lib/auth/role-redirect";
+import { getDashboardPath } from "@/lib/auth/role-redirect";
 
-const registerSchema = z.object({
-  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
-  email: z.string().email("Email inválido."),
-  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres."),
-  role: z.enum(["PROFESSIONAL", "CLIENT"]),
+const schema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(8),
+  role: z.enum(["CLIENT", "PROFESSIONAL"]),
 });
 
 export async function POST(request: NextRequest) {
-  const formData = await request.formData();
-
-  const parsed = registerSchema.safeParse({
-    name: String(formData.get("name") ?? ""),
-    email: String(formData.get("email") ?? "").toLowerCase().trim(),
-    password: String(formData.get("password") ?? ""),
-    role: String(formData.get("role") ?? "CLIENT"),
+  const form = await request.formData();
+  const parsed = schema.safeParse({
+    name: String(form.get("name") ?? ""),
+    email: String(form.get("email") ?? "").toLowerCase().trim(),
+    password: String(form.get("password") ?? ""),
+    role: String(form.get("role") ?? "CLIENT"),
   });
 
   if (!parsed.success) {
-    const message = parsed.error.issues[0]?.message ?? "Datos inválidos.";
-    return NextResponse.redirect(
-      new URL(`/register?error=${encodeURIComponent(message)}`, request.url)
-    );
+    const msg = encodeURIComponent(parsed.error.issues[0]?.message ?? "Datos inválidos");
+    return NextResponse.redirect(new URL(`/register?error=${msg}`, request.url));
   }
 
   const { name, email, password, role } = parsed.data;
 
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) {
-    return NextResponse.redirect(
-      new URL(`/register?error=${encodeURIComponent("Ya existe un usuario con ese email.")}`, request.url)
-    );
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    return NextResponse.redirect(new URL("/register?error=Email+ya+registrado", request.url));
   }
 
-  const supabaseAdmin = createSupabaseAdminClient();
-  const { data: createdUserData, error: createUserError } =
-    await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { name, role },
-    });
+  const admin = createSupabaseAdminClient();
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    email, password, email_confirm: true, user_metadata: { name, role },
+  });
 
-  if (createUserError || !createdUserData.user) {
-    return NextResponse.redirect(
-      new URL(`/register?error=${encodeURIComponent(createUserError?.message ?? "No se pudo crear el usuario.")}`, request.url)
-    );
+  if (createErr || !created.user) {
+    const msg = encodeURIComponent(createErr?.message ?? "Error al crear usuario");
+    return NextResponse.redirect(new URL(`/register?error=${msg}`, request.url));
   }
 
   const appUser = await prisma.user.create({
     data: {
-      id: createdUserData.user.id,
-      email,
-      name,
-      role,
+      id: created.user.id, email, name, role,
       clientProfile: role === "CLIENT" ? { create: {} } : undefined,
       professionalProfile: role === "PROFESSIONAL" ? { create: {} } : undefined,
     },
   });
 
-  // Iniciar sesión automáticamente con las credenciales recién creadas
-  const cookiesToSet: { name: string; value: string; options: Parameters<NextResponse["cookies"]["set"]>[2] }[] = [];
-
+  // Auto-login después del registro
+  const collected: { name: string; value: string; options: Parameters<NextResponse["cookies"]["set"]>[2] }[] = [];
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return request.cookies.getAll(); },
-        setAll(items) {
-          items.forEach(({ name, value, options }) => cookiesToSet.push({ name, value, options }));
-        },
+        getAll: () => request.cookies.getAll(),
+        setAll: (items) => items.forEach(({ name, value, options }) => collected.push({ name, value, options })),
       },
     }
   );
 
   await supabase.auth.signInWithPassword({ email, password });
 
-  const res = NextResponse.redirect(new URL(getDashboardPathByRole(appUser.role), request.url));
-  cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
+  const res = NextResponse.redirect(new URL(getDashboardPath(appUser.role), request.url));
+  collected.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
   return res;
 }

@@ -1,68 +1,24 @@
+import { requireRole } from "@/lib/auth/get-current-user";
 import Link from "next/link";
 
-import { prisma } from "@/lib/db/prisma";
-import { requireRole } from "@/lib/auth/get-current-user";
-
-export default async function AdminDashboardPage() {
+export default async function AdminDashboard() {
   await requireRole(["ADMIN"]);
 
-  const [
-    usersCount,
-    professionalsCount,
-    clientsCount,
-    servicesCount,
-    appointmentsCount,
-  ] = await Promise.all([
-    prisma.user.count(),
-    prisma.professionalProfile.count(),
-    prisma.clientProfile.count(),
-    prisma.service.count(),
-    prisma.appointment.count(),
-  ]);
-
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-10 text-white">
-      <section className="mx-auto max-w-6xl">
-        <header className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-emerald-400">Admin</p>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-          </div>
-
-          <Link
-            href="/logout"
-            className="rounded-xl border border-slate-700 px-4 py-2 text-sm"
-          >
-            Salir
-          </Link>
-        </header>
-
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          <Stat label="Usuarios" value={usersCount} />
-          <Stat label="Profesionales" value={professionalsCount} />
-          <Stat label="Clientes" value={clientsCount} />
-          <Stat label="Servicios" value={servicesCount} />
-          <Stat label="Turnos" value={appointmentsCount} />
-        </div>
-
-        <div className="mt-10">
-          <Link
-            href="/admin/users"
-            className="inline-block rounded-xl bg-emerald-500 px-6 py-3 text-sm font-bold text-black"
-          >
-            Gestionar usuarios
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+        <span className="font-bold text-slate-900">TurnoPro Admin</span>
+        <Link href="/logout" className="text-sm text-slate-500 hover:text-slate-700">Salir</Link>
+      </header>
+      <main className="max-w-4xl mx-auto px-6 py-8">
+        <h1 className="text-2xl font-bold text-slate-900 mb-6">Panel de administración</h1>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Link href="/admin/users" className="bg-white border border-slate-200 rounded-xl p-6 hover:border-blue-300 transition-colors">
+            <h2 className="font-semibold text-slate-900 mb-1">Usuarios</h2>
+            <p className="text-sm text-slate-500">Gestionar usuarios de la plataforma</p>
           </Link>
         </div>
-      </section>
-    </main>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-      <p className="text-sm text-slate-400">{label}</p>
-      <p className="mt-2 text-3xl font-bold">{value}</p>
+      </main>
     </div>
   );
 }
