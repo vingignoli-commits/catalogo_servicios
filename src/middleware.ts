@@ -25,14 +25,17 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresca el token en cada request (el unico lugar donde puede hacerlo)
   const { data: { user } } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+
+  // /professional  = dashboard del profesional (protegido)
+  // /professionals = listado público (NO protegido)
   const isProtected =
     path.startsWith("/admin") ||
     path.startsWith("/client") ||
-    path.startsWith("/professional");
+    path === "/professional" ||
+    path.startsWith("/professional/");
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
