@@ -1,16 +1,26 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-// ─── Constantes (duplicadas del app-session para evitar importar Node crypto) ──
-// El middleware corre en Edge Runtime, donde `import crypto from "crypto"` y
-// `Buffer` NO están disponibles. Usamos la Web Crypto API nativa del browser/edge.
+// ─── Verificación del APP_SESSION_COOKIE ──────────────────────────────────────
+// El middleware corre en Edge Runtime. Las variables de entorno server-only como
+// SUPABASE_SERVICE_ROLE_KEY NO están disponibles en Edge.
+// El secreto usado aquí DEBE ser el mismo que en lib/auth/app-session.ts
+// en el momento de crear el token. Ambos usan NEXT_PUBLIC_SUPABASE_ANON_KEY
+// como fallback, pero si el Route Handler tiene SUPABASE_SERVICE_ROLE_KEY
+// disponible (Node runtime), el secreto cambia entre creación y verificación.
+//
+// Solución: fijar el secreto a NEXT_PUBLIC_SUPABASE_ANON_KEY en el middleware
+// (la única variable garantizada en Edge), y en lib/auth/app-session.ts
+// hacer lo mismo para que sean consistentes.
+// Lo ideal es setear APP_SESSION_SECRET en .env para que ambos lo usen.
 
 const APP_SESSION_COOKIE = "turnopro_user_session";
 
-function getSessionSecret(): string {
+function getEdgeSessionSecret(): string {
+  // En Edge Runtime sólo están disponibles NEXT_PUBLIC_* y APP_SESSION_SECRET.
+  // NUNCA usar SUPABASE_SERVICE_ROLE_KEY acá (no existe en Edge).
   return (
     process.env.APP_SESSION_SECRET ??
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
     "local-dev-secret"
   );
@@ -26,8 +36,8 @@ async function verifyAppSessionToken(token: string): Promise<boolean> {
   if (!userId || !signatureHex) return false;
 
   try {
-    const secret = getSessionSecret();
     const encoder = new TextEncoder();
+    const secret = getEdgeSessionSecret();
 
     const key = await crypto.subtle.importKey(
       "raw",
@@ -43,12 +53,10 @@ async function verifyAppSessionToken(token: string): Promise<boolean> {
       encoder.encode(userId)
     );
 
-    // Convertir la firma esperada a hex para comparar con lo que tenemos
     const expectedHex = Array.from(new Uint8Array(expectedBuffer))
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
 
-    // Comparación en tiempo constante (evita timing attacks)
     if (expectedHex.length !== signatureHex.length) return false;
 
     let diff = 0;
@@ -63,18 +71,17 @@ async function verifyAppSessionToken(token: string): Promise<boolean> {
 }
 
 export async function middleware(request: NextRequest) {
-  // ── 1. Verificar APP_SESSION_COOKIE con Web Crypto API (compatible Edge) ───
+  // ── 1. Verificar APP_SESSION_COOKIE ────────────────────────────────────────
   const appSessionToken = request.cookies.get(APP_SESSION_COOKIE)?.value;
 
   if (appSessionToken) {
     const isValid = await verifyAppSessionToken(appSessionToken);
     if (isValid) {
-      // Sesión propia válida → dejar pasar sin tocar nada más.
       return NextResponse.next({ request });
     }
   }
 
-  // ── 2. Sin APP_SESSION_COOKIE válido, verificar sesión de Supabase ─────────
+  // ── 2. Fallback: verificar sesión Supabase y refrescar cookies ─────────────
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -86,7 +93,6 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          // Escribir cookies en el request (para Server Components) y en la response.
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
