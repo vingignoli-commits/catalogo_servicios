@@ -41,13 +41,21 @@ function redirectWithCookies({
   });
 
   if (appUserId) {
-    response.cookies.set(APP_SESSION_COOKIE, createAppSessionToken(appUserId), {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: true,
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    });
+    const isProduction = process.env.NODE_ENV === "production";
+
+    response.cookies.set(
+      APP_SESSION_COOKIE,
+      createAppSessionToken(appUserId),
+      {
+        httpOnly: true,
+        sameSite: "lax",
+        // secure: true sólo en producción; en localhost (http) los browsers
+        // ignoran las cookies Secure y la sesión se pierde al instante.
+        secure: isProduction,
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      }
+    );
   }
 
   return response;
@@ -74,9 +82,7 @@ export async function POST(request: NextRequest) {
   const { name, email, password, role } = parsed.data;
 
   const existingUser = await prisma.user.findUnique({
-    where: {
-      email,
-    },
+    where: { email },
   });
 
   if (existingUser) {
@@ -130,6 +136,7 @@ export async function POST(request: NextRequest) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
+    // Sin Supabase configurado, sólo usar sesión propia (APP_SESSION_COOKIE).
     return redirectWithCookies({
       request,
       path: getDashboardPathByRole(appUser.role),
@@ -148,20 +155,14 @@ export async function POST(request: NextRequest) {
 
       setAll(items) {
         items.forEach(({ name, value, options }) => {
-          cookiesToSet.push({
-            name,
-            value,
-            options,
-          });
+          cookiesToSet.push({ name, value, options });
         });
       },
     },
   });
 
-  await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  // Iniciamos sesión en Supabase para que el browser tenga las cookies de auth.
+  await supabase.auth.signInWithPassword({ email, password });
 
   return redirectWithCookies({
     request,
