@@ -1,49 +1,18 @@
 "use server";
 
+// Este Server Action ya no se usa directamente desde la página de login
+// (la página apunta al Route Handler /auth/login con method="POST").
+//
+// Los Server Actions NO pueden setear cookies de sesión de Supabase de forma
+// confiable cuando terminan con redirect(), por eso el flujo de auth usa
+// Route Handlers (src/app/auth/login/route.ts).
+//
+// Este archivo se mantiene para evitar errores de importación si existe alguna
+// referencia externa, pero NO debe usarse para flujos de autenticación.
+
 import { redirect } from "next/navigation";
 
-import { prisma } from "@/lib/db/prisma";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getDashboardPathByRole } from "@/lib/auth/role-redirect";
-
-export async function loginAction(formData: FormData) {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const password = String(formData.get("password") ?? "");
-
-  if (!email || !password) {
-    redirect("/login?error=Complet%C3%A1%20email%20y%20contrase%C3%B1a.");
-  }
-
-  const supabase = await createSupabaseServerClient();
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error || !data.user?.email) {
-    redirect("/login?error=Credenciales%20inv%C3%A1lidas.");
-  }
-
-  const appUser = await prisma.user.findUnique({
-    where: {
-      email: data.user.email.toLowerCase(),
-    },
-    select: {
-      role: true,
-      status: true,
-    },
-  });
-
-  if (!appUser) {
-    await supabase.auth.signOut();
-    redirect("/login?error=Usuario%20sin%20perfil%20interno.");
-  }
-
-  if (appUser.status === "SUSPENDED") {
-    await supabase.auth.signOut();
-    redirect("/login?error=Tu%20cuenta%20est%C3%A1%20suspendida.");
-  }
-
-  redirect(getDashboardPathByRole(appUser.role));
+export async function loginAction(_formData: FormData) {
+  // Derivar al Route Handler correcto.
+  redirect("/login");
 }
