@@ -4,6 +4,7 @@ type Props = { searchParams: Promise<{ error?: string; next?: string }> };
 
 export default async function LoginPage({ searchParams }: Props) {
   const params = await searchParams;
+  const next = params.next ?? "";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
@@ -20,7 +21,7 @@ export default async function LoginPage({ searchParams }: Props) {
         )}
 
         <form action="/auth/login" method="POST" className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
-          <input type="hidden" name="next" value={params.next ?? ""} />
+          <input type="hidden" name="next" value={next} />
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
