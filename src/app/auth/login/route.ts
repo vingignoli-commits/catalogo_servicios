@@ -3,102 +3,34 @@ import { createServerClient } from "@supabase/ssr";
 
 import { prisma } from "@/lib/db/prisma";
 import { getDashboardPathByRole } from "@/lib/auth/role-redirect";
-import {
-  APP_SESSION_COOKIE,
-  createAppSessionToken,
-} from "@/lib/auth/app-session";
-
-type CookieToSet = {
-  name: string;
-  value: string;
-  options: Parameters<NextResponse["cookies"]["set"]>[2];
-};
-
-function redirectWithCookies({
-  request,
-  path,
-  cookiesToSet,
-  appUserId,
-}: {
-  request: NextRequest;
-  path: string;
-  cookiesToSet: CookieToSet[];
-  appUserId?: string;
-}) {
-  const response = NextResponse.redirect(new URL(path, request.url));
-
-  cookiesToSet.forEach(({ name, value, options }) => {
-    response.cookies.set(name, value, options);
-  });
-
-  if (appUserId) {
-    const isProduction = process.env.NODE_ENV === "production";
-
-    response.cookies.set(
-      APP_SESSION_COOKIE,
-      createAppSessionToken(appUserId),
-      {
-        httpOnly: true,
-        sameSite: "lax",
-        // secure: true sólo en producción; en localhost (http) los browsers
-        // ignoran las cookies Secure y la sesión se pierde al instante.
-        secure: isProduction,
-        path: "/",
-        maxAge: 60 * 60 * 24 * 30,
-      }
-    );
-  }
-
-  return response;
-}
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
-
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
     return NextResponse.redirect(
-      new URL(
-        "/login?error=Complet%C3%A1%20email%20y%20contrase%C3%B1a.",
-        request.url
-      )
+      new URL("/login?error=Complet%C3%A1%20email%20y%20contrase%C3%B1a.", request.url)
     );
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const cookiesToSet: { name: string; value: string; options: Parameters<NextResponse["cookies"]["set"]>[2] }[] = [];
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.redirect(
-      new URL(
-        "/login?error=Faltan%20variables%20de%20Supabase.",
-        request.url
-      )
-    );
-  }
-
-  const cookiesToSet: CookieToSet[] = [];
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return request.cookies.getAll(); },
+        setAll(items) {
+          items.forEach(({ name, value, options }) => cookiesToSet.push({ name, value, options }));
+        },
       },
+    }
+  );
 
-      setAll(items) {
-        items.forEach(({ name, value, options }) => {
-          cookiesToSet.push({ name, value, options });
-        });
-      },
-    },
-  });
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error || !data.user?.email) {
     return NextResponse.redirect(
@@ -107,40 +39,25 @@ export async function POST(request: NextRequest) {
   }
 
   const appUser = await prisma.user.findUnique({
-    where: {
-      email: data.user.email.toLowerCase(),
-    },
-    select: {
-      id: true,
-      role: true,
-      status: true,
-    },
+    where: { email: data.user.email.toLowerCase() },
+    select: { id: true, role: true, status: true },
   });
 
   if (!appUser) {
     await supabase.auth.signOut();
-
-    return redirectWithCookies({
-      request,
-      path: "/login?error=Usuario%20sin%20perfil%20interno.",
-      cookiesToSet,
-    });
+    const res = NextResponse.redirect(new URL("/login?error=Usuario%20sin%20perfil%20interno.", request.url));
+    cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
+    return res;
   }
 
   if (appUser.status === "SUSPENDED") {
     await supabase.auth.signOut();
-
-    return redirectWithCookies({
-      request,
-      path: "/login?error=Tu%20cuenta%20est%C3%A1%20suspendida.",
-      cookiesToSet,
-    });
+    const res = NextResponse.redirect(new URL("/login?error=Tu%20cuenta%20est%C3%A1%20suspendida.", request.url));
+    cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
+    return res;
   }
 
-  return redirectWithCookies({
-    request,
-    path: getDashboardPathByRole(appUser.role),
-    cookiesToSet,
-    appUserId: appUser.id,
-  });
+  const res = NextResponse.redirect(new URL(getDashboardPathByRole(appUser.role), request.url));
+  cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
+  return res;
 }
