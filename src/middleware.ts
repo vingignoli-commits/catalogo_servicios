@@ -13,10 +13,13 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
+          // Escribir en el request para que el Server Component los vea
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
+          // Reconstruir response con el request actualizado
           response = NextResponse.next({ request });
+          // Escribir en la response para que el browser los reciba
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
@@ -25,20 +28,19 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Siempre llamar getUser() para que Supabase refresque el token si hace falta.
-  // Esto es lo que escribe las cookies actualizadas en la response.
   const { data: { user } } = await supabase.auth.getUser();
 
-  const isProtectedRoute = request.nextUrl.pathname.startsWith("/admin") ||
-    request.nextUrl.pathname.startsWith("/client") ||
-    request.nextUrl.pathname.startsWith("/professional");
+  const path = request.nextUrl.pathname;
 
-  // Solo bloquear en rutas protegidas. En rutas públicas (professionals/*/slots/confirm)
-  // solo refrescamos cookies y dejamos pasar — la página se encarga de redirigir si hace falta.
+  const isProtectedRoute =
+    path.startsWith("/admin") ||
+    path.startsWith("/client") ||
+    path.startsWith("/professional");
+
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("next", request.nextUrl.pathname);
+    url.searchParams.set("next", path);
     return NextResponse.redirect(url);
   }
 
@@ -46,12 +48,13 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Incluir las rutas públicas que necesitan sesión (para refrescar cookies),
-  // además de las rutas protegidas que bloquean si no hay usuario.
   matcher: [
+    // Rutas protegidas: bloquean si no hay sesión
     "/admin/:path*",
     "/client/:path*",
     "/professional/:path*",
-    "/professionals/:id/slots/confirm",
+    // Rutas públicas que necesitan que las cookies estén frescas
+    // para que getCurrentUser() funcione en el Server Component
+    "/professionals/:path*",
   ],
 };
