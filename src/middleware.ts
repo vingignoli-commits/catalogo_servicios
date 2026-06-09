@@ -25,9 +25,17 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // Siempre llamar getUser() para que Supabase refresque el token si hace falta.
+  // Esto es lo que escribe las cookies actualizadas en la response.
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
+  const isProtectedRoute = request.nextUrl.pathname.startsWith("/admin") ||
+    request.nextUrl.pathname.startsWith("/client") ||
+    request.nextUrl.pathname.startsWith("/professional");
+
+  // Solo bloquear en rutas protegidas. En rutas públicas (professionals/*/slots/confirm)
+  // solo refrescamos cookies y dejamos pasar — la página se encarga de redirigir si hace falta.
+  if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", request.nextUrl.pathname);
@@ -38,5 +46,12 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/client/:path*", "/professional/:path*"],
+  // Incluir las rutas públicas que necesitan sesión (para refrescar cookies),
+  // además de las rutas protegidas que bloquean si no hay usuario.
+  matcher: [
+    "/admin/:path*",
+    "/client/:path*",
+    "/professional/:path*",
+    "/professionals/:id/slots/confirm",
+  ],
 };
