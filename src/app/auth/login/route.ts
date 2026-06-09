@@ -7,6 +7,7 @@ export async function POST(request: NextRequest) {
   const form = await request.formData();
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
+  const next = String(form.get("next") ?? "").trim();
 
   if (!email || !password) {
     return NextResponse.redirect(new URL("/login?error=Completá+email+y+contraseña", request.url));
@@ -39,10 +40,14 @@ export async function POST(request: NextRequest) {
   if (!user || user.status === "SUSPENDED") {
     await supabase.auth.signOut();
     const msg = !user ? "Usuario+sin+perfil" : "Cuenta+suspendida";
-    return NextResponse.redirect(new URL(`/login?error=${msg}`, request.url));
+    const res = NextResponse.redirect(new URL(`/login?error=${msg}`, request.url));
+    collected.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
+    return res;
   }
 
-  const res = NextResponse.redirect(new URL(getDashboardPath(user.role), request.url));
+  // Redirigir al next si existe y es seguro, sino al dashboard
+  const redirectTo = next && next.startsWith("/") ? next : getDashboardPath(user.role);
+  const res = NextResponse.redirect(new URL(redirectTo, request.url));
   collected.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
   return res;
 }
