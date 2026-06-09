@@ -1,65 +1,32 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const protectedRoutes = ["/admin", "/professional", "/client"];
-const APP_SESSION_COOKIE = "turnopro_user_session";
-
-function matchesRoute(pathname: string, route: string) {
-  return pathname === route || pathname.startsWith(`${route}/`);
-}
-
-function isProtectedRoute(pathname: string) {
-  return protectedRoutes.some((route) => matchesRoute(pathname, route));
-}
-
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request,
   });
 
-  const pathname = request.nextUrl.pathname;
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
 
-  if (!isProtectedRoute(pathname)) {
-    return response;
-  }
+        setAll(cookiesToSet) {
+          response = NextResponse.next({
+            request,
+          });
 
-  const appSession = request.cookies.get(APP_SESSION_COOKIE)?.value;
-
-  if (appSession) {
-    return response;
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
+        },
       },
-
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) => {
-          request.cookies.set(name, value);
-        });
-
-        response = NextResponse.next({
-          request,
-        });
-
-        cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options);
-        });
-      },
-    },
-  });
+    }
+  );
 
   const {
     data: { user },
@@ -68,7 +35,7 @@ export async function middleware(request: NextRequest) {
   if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("next", pathname);
+    url.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
 
@@ -76,7 +43,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: ["/admin/:path*", "/client/:path*", "/professional/:path*"],
 };
