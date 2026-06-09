@@ -1,0 +1,8 @@
+DATABASE_URL="postgresql://postgres.cdaelxkxufnmqnldktmm:[YOUR-PASSWORD]@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+
+DIRECT_URL="postgresql://postgres.cdaelxkxufnmqnldktmm:[YOUR-PASSWORD]@aws-1-sa-east-1.pooler.supabase.com:5432/postgres"
+
+NEXT_PUBLIC_SUPABASE_URL=https://cdaelxkxufnmqnldktmm.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_h6gfc5HqU4q0ZnemSriyyg_SfnCScSa
+
+
