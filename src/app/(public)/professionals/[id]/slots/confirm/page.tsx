@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 import { prisma } from "@/lib/db/prisma";
-import { requireRole } from "@/lib/auth/get-current-user";
+import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { AppCard } from "@/components/ui/app-card";
 import { PageShell } from "@/components/ui/page-shell";
 import { confirmAppointmentAction } from "./actions";
@@ -43,10 +43,22 @@ export default async function ConfirmAppointmentPage({
   const { id } = await params;
   const query = await searchParams;
 
-  await requireRole(["CLIENT"]);
-
   if (!query.serviceId || !query.date || !query.startTime || !query.endTime) {
     return notFound();
+  }
+
+  const user = await getCurrentUser();
+
+  const currentUrl = `/professionals/${id}/slots/confirm?${new URLSearchParams({
+    serviceId: query.serviceId,
+    ...(query.resourceId ? { resourceId: query.resourceId } : {}),
+    date: query.date,
+    startTime: query.startTime,
+    endTime: query.endTime,
+  }).toString()}`;
+
+  if (!user) {
+    redirect(`/login?next=${encodeURIComponent(currentUrl)}`);
   }
 
   const professional = await prisma.professionalProfile.findUnique({
@@ -90,8 +102,44 @@ export default async function ConfirmAppointmentPage({
     );
   }
 
+  if (user.role !== "CLIENT") {
+    return (
+      <PageShell
+        variant="public"
+        backHref={`/professionals/${professional.id}/slots?serviceId=${service.id}&date=${query.date}`}
+        eyebrow="Cuenta incorrecta"
+        title="Para reservar necesitás una cuenta de cliente"
+        subtitle="Estás logueado, pero tu cuenta no tiene rol de cliente."
+      >
+        <AppCard className="border-amber-200 bg-amber-50">
+          <p className="text-sm leading-relaxed text-amber-800">
+            Rol actual: <strong>{user.role}</strong>. Cerrá sesión e ingresá con
+            una cuenta CLIENT, o creá una cuenta nueva como cliente.
+          </p>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/logout"
+              className="rounded-xl bg-amber-600 px-5 py-3 text-sm font-bold text-white"
+            >
+              Cerrar sesión
+            </Link>
+
+            <Link
+              href="/register"
+              className="rounded-xl border border-amber-300 bg-white px-5 py-3 text-sm font-bold text-amber-700"
+            >
+              Crear cuenta cliente
+            </Link>
+          </div>
+        </AppCard>
+      </PageShell>
+    );
+  }
+
   const selectedDate = new Date(`${query.date}T00:00:00`);
-  const displayName = professional.user.name ?? professional.user.email.split("@")[0];
+  const displayName =
+    professional.user.name ?? professional.user.email.split("@")[0];
 
   return (
     <PageShell
@@ -112,6 +160,7 @@ export default async function ConfirmAppointmentPage({
               <h2 className="text-2xl font-bold text-slate-950">
                 Resumen de reserva
               </h2>
+
               <p className="mt-2 text-sm leading-relaxed text-slate-500">
                 Al confirmar, el turno queda como solicitado. El profesional
                 deberá aceptarlo desde su panel.
@@ -165,7 +214,10 @@ export default async function ConfirmAppointmentPage({
             />
           </div>
 
-          <form action={confirmAppointmentAction} className="mt-8 flex flex-wrap gap-3">
+          <form
+            action={confirmAppointmentAction}
+            className="mt-8 flex flex-wrap gap-3"
+          >
             <input type="hidden" name="professionalId" value={professional.id} />
             <input type="hidden" name="serviceId" value={service.id} />
             <input type="hidden" name="resourceId" value={resource?.id ?? ""} />
@@ -191,9 +243,8 @@ export default async function ConfirmAppointmentPage({
 
         <aside className="space-y-6">
           <AppCard className="border-blue-100 bg-blue-50">
-            <h3 className="text-xl font-bold text-slate-950">
-              Importante
-            </h3>
+            <h3 className="text-xl font-bold text-slate-950">Importante</h3>
+
             <p className="mt-3 text-sm leading-relaxed text-slate-600">
               Este turno queda pendiente hasta que el profesional lo acepte.
               Podés ver el estado desde tu panel de turnos.
@@ -201,13 +252,9 @@ export default async function ConfirmAppointmentPage({
           </AppCard>
 
           <AppCard>
-            <h3 className="text-xl font-bold text-slate-950">
-              Profesional
-            </h3>
+            <h3 className="text-xl font-bold text-slate-950">Profesional</h3>
 
-            <p className="mt-3 text-sm text-slate-500">
-              {displayName}
-            </p>
+            <p className="mt-3 text-sm text-slate-500">{displayName}</p>
 
             <p className="mt-2 text-sm text-slate-500">
               {professional.location || "Sin dirección cargada"}
